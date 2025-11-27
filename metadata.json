@@ -1,0 +1,5 @@
+{
+  "name": "Grand Exchange Analyzer",
+  "description": "An algorithmic OSRS flipping assistant that uses real-time OSRS Wiki API data to find profitable trades on the Grand Exchange.",
+  "requestFramePermissions": []
+}

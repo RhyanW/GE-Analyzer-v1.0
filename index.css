@@ -1,0 +1,14 @@
+:root {
+  --bg-primary: #121212;
+  --bg-panel: #2d2d2d;
+  --border: #3e3529;
+  --accent: #d4af37;
+  --text-primary: #e0e0e0;
+  --text-secondary: #9ca3af;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
