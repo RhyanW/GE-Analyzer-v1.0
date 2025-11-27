@@ -1,20 +1,77 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# OSRS Grand Exchange Analyzer 📉💰
 
-# Run and deploy your AI Studio app
+A powerful, modern web application for identifying profitable flipping and high alchemy opportunities in Old School RuneScape. Built with React, TypeScript, and Tailwind CSS.
 
-This contains everything you need to run your app locally.
+![OSRS GE Flipper](https://oldschool.runescape.wiki/images/Grand_Exchange_logo.png)
 
-View your app in AI Studio: https://ai.studio/apps/drive/1w_w_xhs-JBYjWWROvQPEVB1iz2a9acAa
+## ✨ Features
 
-## Run Locally
+-   **Real-Time Market Analysis**: Fetches live data from the OSRS Wiki API.
+-   **Smart Flipping Logic**:
+    -   Calculates profit margins after GE tax.
+    -   Analyzes 24h volume and buy limits.
+    -   Determines price trends (UP/DOWN/STABLE).
+    -   Filters by budget, ROI, and risk level.
+-   **High Alchemy Mode**: Dedicated mode to find profitable alch items.
+-   **Budget Awareness**: Profit calculations are capped by your available capital.
+-   **Modern UI**: Sleek, dark-themed interface inspired by modern gaming dashboards.
+-   **Mobile Responsive**: Fully functional on desktop and mobile devices.
+-   **No API Key Required**: Runs entirely client-side using public APIs.
 
-**Prerequisites:**  Node.js
+## 🚀 Getting Started
 
+### Prerequisites
 
-1. Install dependencies:
-   `npm install`
+-   Node.js (v18 or higher)
+-   npm
 
-3. Run the app:
-   `npm run dev`
+### Installation
+
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/yourusername/grand-exchange-analyzer.git
+    cd grand-exchange-analyzer
+    ```
+
+2.  Install dependencies:
+    ```bash
+    npm install
+    ```
+
+3.  Start the development server:
+    ```bash
+    npm run dev
+    ```
+
+4.  Open your browser and navigate to `http://localhost:3000`.
+
+## 🛠️ Deployment
+
+This application is designed to be hosted as a static site. It comes pre-configured for **GitHub Pages**.
+
+### Deploying to GitHub Pages
+
+1.  Push your code to a GitHub repository.
+2.  Go to **Settings** > **Pages**.
+3.  Under **Build and deployment**, select **GitHub Actions** as the source.
+4.  The included workflow (`.github/workflows/deploy.yml`) will automatically build and deploy your site on every push to the `main` branch.
+
+## 🧰 Tech Stack
+
+-   **Framework**: [React](https://react.dev/) + [Vite](https://vitejs.dev/)
+-   **Language**: [TypeScript](https://www.typescriptlang.org/)
+-   **Styling**: [Tailwind CSS](https://tailwindcss.com/)
+-   **Icons**: [Lucide React](https://lucide.dev/)
+-   **Data Source**: [OSRS Wiki Real-time Prices API](https://oldschool.runescape.wiki/w/RuneScape:Real-time_Prices)
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+This project is open source and available under the [MIT License](LICENSE).
+
+---
+
+*Note: This application is not affiliated with Jagex or Old School RuneScape.*
