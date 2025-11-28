@@ -126,6 +126,19 @@ const PlayerStatsDisplay: React.FC<PlayerStatsDisplayProps> = ({ stats, username
         return getXpForLevel(level);
     };
 
+    const NON_COMBAT_MAGIC_METHODS = [
+        'Splashing',
+        'High Alchemy',
+        'Plank Make',
+        'String Jewellery',
+        'Stun-Alch',
+        'Enchant Bolts (Dragonstone)',
+        'Enchant Bolts (Onyx)'
+    ];
+
+    const showCombatSettings = selectedSkill && COMBAT_SKILLS.includes(selectedSkill) &&
+        !(selectedSkill === 'magic' && NON_COMBAT_MAGIC_METHODS.includes(methodSearch));
+
     return (
         <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
@@ -336,7 +349,7 @@ const PlayerStatsDisplay: React.FC<PlayerStatsDisplayProps> = ({ stats, username
                                             </div>
 
                                             {/* Combat Stats Input */}
-                                            {COMBAT_SKILLS.includes(selectedSkill) && (
+                                            {showCombatSettings && (
                                                 <div className="bg-osrs-bg/30 p-3 rounded border border-white/5 space-y-3">
                                                     <div className="flex items-center gap-2 text-xs text-osrs-yellow font-bold">
                                                         <Settings size={12} /> Combat Settings
@@ -479,7 +492,7 @@ const PlayerStatsDisplay: React.FC<PlayerStatsDisplayProps> = ({ stats, username
 
                                     {SKILL_UNLOCKS[selectedSkill] ? (
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            {(['Item', 'Quest', 'Other'] as UnlockCategory[]).map(category => {
+                                            {(['Item', 'Quest', 'Ability', 'Other'] as UnlockCategory[]).map(category => {
                                                 const categoryUnlocks = SKILL_UNLOCKS[selectedSkill]!
                                                     .filter(u => u.category === category && u.level > (stats[selectedSkill] as SkillData).level)
                                                     .sort((a, b) => a.level - b.level);
@@ -489,7 +502,7 @@ const PlayerStatsDisplay: React.FC<PlayerStatsDisplayProps> = ({ stats, username
                                                 return (
                                                     <div key={category} className="bg-osrs-bg/30 rounded p-3 border border-white/5">
                                                         <h5 className="text-osrs-yellow font-bold text-sm mb-2 border-b border-white/10 pb-1">
-                                                            {category === 'Other' ? 'Abilities & Other' : `${category}s`}
+                                                            {category === 'Ability' ? 'Abilities' : category === 'Other' ? 'Other' : `${category}s`}
                                                         </h5>
                                                         <ul className="space-y-2">
                                                             {categoryUnlocks.map((unlock, i) => (
