@@ -72,7 +72,7 @@ const FlipForm: React.FC<FlipFormProps> = ({ onSearch, isLoading }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (budget <= 0) {
+    if (strategy !== StrategyType.PLAYER_LOOKUP && budget <= 0) {
       setBudgetError(true);
       return;
     }
@@ -105,7 +105,7 @@ const FlipForm: React.FC<FlipFormProps> = ({ onSearch, isLoading }) => {
         {/* Strategy Selection */}
         <div>
           <label className="block text-osrs-gold mb-2 font-bold">Strategy</label>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <button
               type="button"
               onClick={() => setStrategy(StrategyType.FLIPPING)}
@@ -128,60 +128,25 @@ const FlipForm: React.FC<FlipFormProps> = ({ onSearch, isLoading }) => {
               <RefreshCcw className="w-4 h-4" />
               <span className="font-bold">High Alchemy</span>
             </button>
+            <button
+              type="button"
+              onClick={() => setStrategy(StrategyType.PLAYER_LOOKUP)}
+              className={`flex items-center justify-center gap-2 p-3 rounded border transition-all ${strategy === StrategyType.PLAYER_LOOKUP
+                ? 'bg-blue-700 text-white border-white shadow-[0_0_10px_rgba(59,130,246,0.3)]'
+                : 'bg-black/30 text-gray-400 border-osrs-border hover:border-gray-500'
+                }`}
+            >
+              <User className="w-4 h-4" />
+              <span className="font-bold">Player Lookup</span>
+            </button>
           </div>
         </div>
 
-        {/* Inputs Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {strategy === StrategyType.PLAYER_LOOKUP ? (
+          // PLAYER LOOKUP MODE
           <div>
             <label className="block text-osrs-gold mb-2 font-bold">
-              Specific Item <span className="text-gray-500 font-normal text-xs">(Optional)</span>
-            </label>
-            <div className="relative" ref={autocompleteRef}>
-              <input
-                type="text"
-                value={itemName}
-                onChange={(e) => handleItemNameChange(e.target.value)}
-                onFocus={() => itemName.length > 0 && itemSuggestions.length > 0 && setShowSuggestions(true)}
-                className="w-full bg-black/30 border border-osrs-border rounded px-4 py-3 text-white focus:outline-none focus:border-osrs-gold transition-colors pl-10 pr-10"
-                placeholder="e.g. Abyssal whip"
-                autoComplete="off"
-              />
-              <Search className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
-              {itemName && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setItemName('');
-                    setShowSuggestions(false);
-                  }}
-                  className="absolute right-3 top-3 text-gray-500 hover:text-white transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              )}
-
-              {/* Autocomplete dropdown */}
-              {showSuggestions && itemSuggestions.length > 0 && (
-                <div className="absolute z-50 w-full mt-1 bg-osrs-panel border border-osrs-gold rounded-lg shadow-2xl max-h-60 overflow-y-auto">
-                  {itemSuggestions.map((suggestion, idx) => (
-                    <div
-                      key={idx}
-                      onClick={() => selectSuggestion(suggestion)}
-                      className="px-4 py-2 text-white hover:bg-osrs-gold hover:text-black cursor-pointer transition-colors text-sm border-b border-osrs-border last:border-b-0"
-                    >
-                      {suggestion}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Username (Optional) */}
-          <div>
-            <label className="block text-osrs-gold mb-2 font-bold">
-              OSRS Name <span className="text-gray-500 font-normal text-xs">(For XP Calc)</span>
+              OSRS Username
             </label>
             <div className="relative">
               <input
@@ -189,124 +154,193 @@ const FlipForm: React.FC<FlipFormProps> = ({ onSearch, isLoading }) => {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full bg-black/30 border border-osrs-border rounded px-4 py-3 text-white focus:outline-none focus:border-osrs-gold transition-colors pl-10"
-                placeholder="Username"
+                placeholder="Enter username to lookup stats..."
+                autoFocus
               />
               <User className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
             </div>
           </div>
-        </div>
+        ) : (
+          // MARKET MODES
+          <>
+            {/* Inputs Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-osrs-gold mb-2 font-bold">
+                  Specific Item <span className="text-gray-500 font-normal text-xs">(Optional)</span>
+                </label>
+                <div className="relative" ref={autocompleteRef}>
+                  <input
+                    type="text"
+                    value={itemName}
+                    onChange={(e) => handleItemNameChange(e.target.value)}
+                    onFocus={() => itemName.length > 0 && itemSuggestions.length > 0 && setShowSuggestions(true)}
+                    className="w-full bg-black/30 border border-osrs-border rounded px-4 py-3 text-white focus:outline-none focus:border-osrs-gold transition-colors pl-10 pr-10"
+                    placeholder="e.g. Abyssal whip"
+                    autoComplete="off"
+                  />
+                  <Search className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
+                  {itemName && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setItemName('');
+                        setShowSuggestions(false);
+                      }}
+                      className="absolute right-3 top-3 text-gray-500 hover:text-white transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  )}
 
-        {/* Budget Input */}
-        <div>
-          <label className="block text-osrs-gold mb-2 font-bold">
-            Budget (GP) <span className="text-gray-500 font-normal">({formatNumber(budget)})</span>
-          </label>
-          <div className="relative">
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={budget}
-              onChange={(e) => {
-                setBudget(Number(e.target.value));
-                if (Number(e.target.value) > 0) setBudgetError(false);
-              }}
-              className={`w-full bg-black/30 border rounded px-4 py-3 text-white focus:outline-none transition-colors ${budgetError ? 'border-red-500 focus:border-red-500' : 'border-osrs-border focus:border-osrs-gold'
-                }`}
-              placeholder="e.g. 1000000"
-            />
-            <div className="absolute right-3 top-3 text-osrs-gold font-fantasy text-sm">GP</div>
-          </div>
-          {budgetError && (
-            <p className="text-red-500 text-xs mt-1 animate-pulse font-bold">
-              Please enter a budget greater than 0 to continue.
-            </p>
-          )}
-          <div className="flex gap-2 mt-2 flex-wrap">
-            {[1000000, 10000000, 100000000, 500000000, 1000000000].map((amt) => (
-              <button
-                type="button"
-                key={amt}
-                onClick={() => setBudget(prev => prev + amt)}
-                className="text-xs bg-osrs-border hover:bg-osrs-gold hover:text-black text-gray-300 px-3 py-1 rounded transition-colors"
-              >
-                +{formatNumber(amt)}
-              </button>
-            ))}
-          </div>
-        </div>
+                  {/* Autocomplete dropdown */}
+                  {showSuggestions && itemSuggestions.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-osrs-panel border border-osrs-gold rounded-lg shadow-2xl max-h-60 overflow-y-auto">
+                      {itemSuggestions.map((suggestion, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => selectSuggestion(suggestion)}
+                          className="px-4 py-2 text-white hover:bg-osrs-gold hover:text-black cursor-pointer transition-colors text-sm border-b border-osrs-border last:border-b-0"
+                        >
+                          {suggestion}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
 
-        {/* Amount of Results Slider */}
-        <div>
-          <div className="flex justify-between mb-2">
-            <label className="text-osrs-gold font-bold flex items-center gap-2">
-              <ListOrdered className="w-4 h-4" /> Results Amount
-            </label>
-            <span className="text-white font-mono bg-black/50 px-2 rounded border border-osrs-border">
-              {resultCount} Items
-            </span>
-          </div>
-          <input
-            type="range"
-            min="3"
-            max="500"
-            step="1"
-            value={resultCount}
-            onChange={(e) => setResultCount(Number(e.target.value))}
-            className="w-full h-2 bg-black/50 rounded-lg appearance-none cursor-pointer accent-osrs-gold border border-osrs-border"
-          />
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
-            <span>3</span>
-            <span>500</span>
-          </div>
-        </div>
-
-        {/* Membership Toggle & Risk */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-osrs-gold mb-2 font-bold">Membership Status</label>
-            <div className="flex bg-black/30 rounded p-1 border border-osrs-border">
-              <button
-                type="button"
-                onClick={() => setMembership(MembershipStatus.F2P)}
-                className={`flex-1 py-2 text-sm font-bold rounded transition-colors ${membership === MembershipStatus.F2P
-                  ? 'bg-osrs-border text-white'
-                  : 'text-gray-500 hover:text-gray-300'
-                  }`}
-              >
-                F2P
-              </button>
-              <button
-                type="button"
-                onClick={() => setMembership(MembershipStatus.P2P)}
-                className={`flex-1 py-2 text-sm font-bold rounded transition-colors ${membership === MembershipStatus.P2P
-                  ? 'bg-osrs-gold text-black'
-                  : 'text-gray-500 hover:text-gray-300'
-                  }`}
-              >
-                Member
-              </button>
+              {/* Username (Optional) */}
+              <div>
+                <label className="block text-osrs-gold mb-2 font-bold">
+                  OSRS Name <span className="text-gray-500 font-normal text-xs">(For XP Calc)</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="w-full bg-black/30 border border-osrs-border rounded px-4 py-3 text-white focus:outline-none focus:border-osrs-gold transition-colors pl-10"
+                    placeholder="Username"
+                  />
+                  <User className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
+                </div>
+              </div>
             </div>
-          </div>
 
-          {/* Risk Level */}
-          <div>
-            <label className="block text-osrs-gold mb-2 font-bold">
-              {strategy === StrategyType.HIGH_ALCH ? 'Volume Preference' : 'Risk Appetite'}
-            </label>
-            <select
-              value={risk}
-              onChange={(e) => setRisk(e.target.value as RiskLevel)}
-              className="w-full bg-black/30 border border-osrs-border rounded px-4 py-2.5 text-white focus:outline-none focus:border-osrs-gold"
-            >
-              {Object.values(RiskLevel).map((level) => (
-                <option key={level} value={level} className="bg-osrs-panel">
-                  {level}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+            {/* Budget Input */}
+            <div>
+              <label className="block text-osrs-gold mb-2 font-bold">
+                Budget (GP) <span className="text-gray-500 font-normal">({formatNumber(budget)})</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={budget}
+                  onChange={(e) => {
+                    setBudget(Number(e.target.value));
+                    if (Number(e.target.value) > 0) setBudgetError(false);
+                  }}
+                  className={`w-full bg-black/30 border rounded px-4 py-3 text-white focus:outline-none transition-colors ${budgetError ? 'border-red-500 focus:border-red-500' : 'border-osrs-border focus:border-osrs-gold'
+                    }`}
+                  placeholder="e.g. 1000000"
+                />
+                <div className="absolute right-3 top-3 text-osrs-gold font-fantasy text-sm">GP</div>
+              </div>
+              {budgetError && (
+                <p className="text-red-500 text-xs mt-1 animate-pulse font-bold">
+                  Please enter a budget greater than 0 to continue.
+                </p>
+              )}
+              <div className="flex gap-2 mt-2 flex-wrap">
+                {[1000000, 10000000, 100000000, 500000000, 1000000000].map((amt) => (
+                  <button
+                    type="button"
+                    key={amt}
+                    onClick={() => setBudget(prev => prev + amt)}
+                    className="text-xs bg-osrs-border hover:bg-osrs-gold hover:text-black text-gray-300 px-3 py-1 rounded transition-colors"
+                  >
+                    +{formatNumber(amt)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Amount of Results Slider */}
+            <div>
+              <div className="flex justify-between mb-2">
+                <label className="text-osrs-gold font-bold flex items-center gap-2">
+                  <ListOrdered className="w-4 h-4" /> Results Amount
+                </label>
+                <span className="text-white font-mono bg-black/50 px-2 rounded border border-osrs-border">
+                  {resultCount} Items
+                </span>
+              </div>
+              <input
+                type="range"
+                min="3"
+                max="500"
+                step="1"
+                value={resultCount}
+                onChange={(e) => setResultCount(Number(e.target.value))}
+                className="w-full h-2 bg-black/50 rounded-lg appearance-none cursor-pointer accent-osrs-gold border border-osrs-border"
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>3</span>
+                <span>500</span>
+              </div>
+            </div>
+
+            {/* Membership Toggle & Risk */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-osrs-gold mb-2 font-bold">Membership Status</label>
+                <div className="flex bg-black/30 rounded p-1 border border-osrs-border">
+                  <button
+                    type="button"
+                    onClick={() => setMembership(MembershipStatus.F2P)}
+                    className={`flex-1 py-2 text-sm font-bold rounded transition-colors ${membership === MembershipStatus.F2P
+                      ? 'bg-osrs-border text-white'
+                      : 'text-gray-500 hover:text-gray-300'
+                      }`}
+                  >
+                    F2P
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMembership(MembershipStatus.P2P)}
+                    className={`flex-1 py-2 text-sm font-bold rounded transition-colors ${membership === MembershipStatus.P2P
+                      ? 'bg-osrs-gold text-black'
+                      : 'text-gray-500 hover:text-gray-300'
+                      }`}
+                  >
+                    Member
+                  </button>
+                </div>
+              </div>
+
+              {/* Risk Level */}
+              <div>
+                <label className="block text-osrs-gold mb-2 font-bold">
+                  {strategy === StrategyType.HIGH_ALCH ? 'Volume Preference' : 'Risk Appetite'}
+                </label>
+                <select
+                  value={risk}
+                  onChange={(e) => setRisk(e.target.value as RiskLevel)}
+                  className="w-full bg-black/30 border border-osrs-border rounded px-4 py-2.5 text-white focus:outline-none focus:border-osrs-gold"
+                >
+                  {Object.values(RiskLevel).map((level) => (
+                    <option key={level} value={level} className="bg-osrs-panel">
+                      {level}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Action Button */}
         <button
@@ -319,11 +353,12 @@ const FlipForm: React.FC<FlipFormProps> = ({ onSearch, isLoading }) => {
         >
           {isLoading ? (
             <>
-              <Loader2 className="animate-spin" /> Analyzing Market...
+              <Loader2 className="animate-spin" /> {strategy === StrategyType.PLAYER_LOOKUP ? 'Fetching Stats...' : 'Analyzing Market...'}
             </>
           ) : (
             <>
-              <Search className="w-5 h-5" /> Analyze Market
+              {strategy === StrategyType.PLAYER_LOOKUP ? <User className="w-5 h-5" /> : <Search className="w-5 h-5" />}
+              {strategy === StrategyType.PLAYER_LOOKUP ? 'Lookup Stats' : 'Analyze Market'}
             </>
           )}
         </button>

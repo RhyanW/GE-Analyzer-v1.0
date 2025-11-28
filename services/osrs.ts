@@ -11,10 +11,16 @@ export interface PlayerStats {
     level: number;
     xp: number;
   };
+  sailing?: {
+    rank: number;
+    level: number;
+    xp: number;
+  };
 }
 
 // Cumulative XP required for each level (1-99+)
-const XP_TABLE = [
+// Cumulative XP required for each level (1-99+)
+export const XP_TABLE = [
   0, 0, 83, 174, 276, 388, 512, 650, 801, 969, 1154, 1358, 1584, 1833, 2107, 2411, 2746, 3115, 3523,
   3973, 4470, 5018, 5624, 6291, 7028, 7842, 8740, 9730, 10824, 12031, 13363, 14833, 16456, 18247,
   20224, 22406, 24815, 27473, 30408, 33648, 37224, 41171, 45529, 50339, 55649, 61512, 67983, 75127,
@@ -25,8 +31,18 @@ const XP_TABLE = [
   7944614, 8771558, 9684577, 10692629, 11805606, 13034431
 ];
 
+// Conservative XP/Hr rates for "Time to 99" estimation
+export const XP_RATES: Record<string, number> = {
+  attack: 70000, defence: 70000, strength: 80000, hitpoints: 50000,
+  ranged: 150000, prayer: 200000, magic: 150000, cooking: 250000,
+  woodcutting: 60000, fletching: 200000, fishing: 50000, firemaking: 250000,
+  crafting: 150000, smithing: 100000, mining: 50000, herblore: 200000,
+  agility: 40000, thieving: 100000, slayer: 30000, farming: 100000, // Effective rate
+  runecraft: 40000, hunter: 80000, construction: 250000, sailing: 50000
+};
+
 export const getXpForLevel = (level: number): number => {
-  if (level >= 100) return 14391160; 
+  if (level >= 100) return 14391160;
   return XP_TABLE[level];
 };
 
@@ -39,34 +55,42 @@ export const getNextLevelXp = (currentLevel: number): number => {
  * Parses the CSV response from OSRS API
  */
 const parseStatsCsv = (csv: string): PlayerStats => {
-    const lines = csv.split('\n');
-    if (lines.length < 8) {
-      // OSRS API returns a short string like "Page not found" if user doesn't exist
-      throw new Error("Invalid response format from OSRS API");
-    }
+  const lines = csv.split('\n');
+  if (lines.length < 24) {
+    throw new Error("Invalid response format from OSRS API");
+  }
 
-    // OSRS Lite API Order:
-    // 0: Overall, 1: Attack, 2: Defence, 3: Strength, 4: Hitpoints, 
-    // 5: Ranged, 6: Prayer, 7: Magic
-    const magicLine = lines[7];
-    const parts = magicLine.split(',');
-    
-    if (parts.length < 3) throw new Error("Could not parse Magic stats");
+  const SKILLS = [
+    'overall', 'attack', 'defence', 'strength', 'hitpoints',
+    'ranged', 'prayer', 'magic', 'cooking', 'woodcutting',
+    'fletching', 'fishing', 'firemaking', 'crafting', 'smithing',
+    'mining', 'herblore', 'agility', 'thieving', 'slayer',
+    'farming', 'runecraft', 'hunter', 'construction'
+  ];
 
-    const [rank, level, xp] = parts.map((val: string) => parseInt(val, 10));
+  const stats: any = {};
 
-    // If unranked, it might return -1
-    if (level === -1) {
-       return { magic: { rank: -1, level: 1, xp: 0 } };
-    }
-
-    return {
-      magic: {
+  SKILLS.forEach((skill, index) => {
+    const line = lines[index];
+    const parts = line.split(',');
+    if (parts.length >= 3) {
+      const [rank, level, xp] = parts.map(val => parseInt(val, 10));
+      stats[skill] = {
         rank,
-        level,
-        xp
-      }
-    };
+        level: level === -1 ? 1 : level, // Handle unranked
+        xp: xp === -1 ? 0 : xp
+      };
+    }
+  });
+
+  // Manually add Sailing (not yet in API, default to 1)
+  stats['sailing'] = {
+    rank: -1,
+    level: 1,
+    xp: 0
+  };
+
+  return stats as PlayerStats;
 };
 
 export const getPlayerStats = async (username: string): Promise<PlayerStats> => {
@@ -78,14 +102,14 @@ export const getPlayerStats = async (username: string): Promise<PlayerStats> => 
   try {
     const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
     const response = await fetch(proxyUrl);
-    
+
     if (response.ok) {
-        const csv = await response.text();
-        // Check for 404 text disguised as 200 OK from proxy
-        if (csv.includes("404 - Page not found")) {
-            throw new Error("User not found");
-        }
-        return parseStatsCsv(csv);
+      const csv = await response.text();
+      // Check for 404 text disguised as 200 OK from proxy
+      if (csv.includes("404 - Page not found")) {
+        throw new Error("User not found");
+      }
+      return parseStatsCsv(csv);
     }
   } catch (err) {
     console.warn("Primary proxy (corsproxy.io) failed, trying backup...", err);
@@ -94,15 +118,15 @@ export const getPlayerStats = async (username: string): Promise<PlayerStats> => 
 
   // Attempt 2: allorigins.win (Backup)
   try {
-     const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
-     const response = await fetch(proxyUrl);
-     
-     if (response.ok) {
-        const data = await response.json();
-        if (data.contents) {
-            return parseStatsCsv(data.contents);
-        }
-     }
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+    const response = await fetch(proxyUrl);
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.contents) {
+        return parseStatsCsv(data.contents);
+      }
+    }
   } catch (err) {
     console.warn("Backup proxy (allorigins) failed", err);
     lastError = err;
@@ -116,14 +140,14 @@ const PROXY_URL = 'https://corsproxy.io/?';
 export const getItemPriceHistory = async (itemId: number): Promise<PriceHistoryPoint[]> => {
   const url = `https://prices.runescape.wiki/api/v1/osrs/timeseries?timestep=6h&id=${itemId}`;
   const proxyUrl = `${PROXY_URL}${encodeURIComponent(url)}`;
-  
+
   try {
     const response = await fetch(proxyUrl);
     if (!response.ok) return [];
-    
+
     const json = await response.json();
     if (!json.data) return [];
-    
+
     return json.data.map((entry: any) => ({
       timestamp: entry.timestamp,
       avgHighPrice: entry.avgHighPrice,

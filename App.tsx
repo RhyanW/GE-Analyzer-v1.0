@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Layout from './components/Layout';
 import FlipForm from './components/FlipForm';
 import ResultsDisplay from './components/ResultsDisplay';
+import PlayerStatsDisplay from './components/PlayerStatsDisplay';
 
 import { analyzeMarket } from './services/market';
 import { getPlayerStats } from './services/osrs';
@@ -113,7 +114,13 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {data && (
+        {/* Show Stats ONLY if we have stats AND we are in Player Lookup mode OR we just looked up a user */}
+        {playerStats && currentSettings?.username && (lastStrategy === StrategyType.PLAYER_LOOKUP || currentSettings.strategy === StrategyType.PLAYER_LOOKUP) && (
+          <PlayerStatsDisplay stats={playerStats} username={currentSettings.username} />
+        )}
+
+        {/* Show Market Results ONLY if we have data AND we are NOT in Player Lookup mode */}
+        {data && lastStrategy !== StrategyType.PLAYER_LOOKUP && (
           <ResultsDisplay
             data={data}
             strategy={lastStrategy}

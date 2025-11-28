@@ -11,7 +11,8 @@ export enum RiskLevel {
 
 export enum StrategyType {
   FLIPPING = 'Merch / Flip',
-  HIGH_ALCH = 'High Alchemy'
+  HIGH_ALCH = 'High Alchemy',
+  PLAYER_LOOKUP = 'Player Lookup'
 }
 
 export interface FlipSettings {
@@ -49,12 +50,38 @@ export interface MarketResponseData {
   parsedItems: ParsedItem[];
 }
 
+export interface SkillData {
+  rank: number;
+  level: number;
+  xp: number;
+}
+
 export interface PlayerStats {
-  magic: {
-    rank: number;
-    level: number;
-    xp: number;
-  };
+  overall: SkillData;
+  attack: SkillData;
+  defence: SkillData;
+  strength: SkillData;
+  hitpoints: SkillData;
+  ranged: SkillData;
+  prayer: SkillData;
+  magic: SkillData;
+  cooking: SkillData;
+  woodcutting: SkillData;
+  fletching: SkillData;
+  fishing: SkillData;
+  firemaking: SkillData;
+  crafting: SkillData;
+  smithing: SkillData;
+  mining: SkillData;
+  herblore: SkillData;
+  agility: SkillData;
+  thieving: SkillData;
+  slayer: SkillData;
+  farming: SkillData;
+  runecraft: SkillData;
+  hunter: SkillData;
+  construction: SkillData;
+  sailing?: SkillData;
 }
 
 export interface PriceHistoryPoint {
