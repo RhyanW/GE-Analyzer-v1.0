@@ -5,16 +5,28 @@ import { Search, Loader2, RefreshCcw, TrendingUp, User, ListOrdered, X } from 'l
 interface FlipFormProps {
   onSearch: (settings: FlipSettings) => void;
   isLoading: boolean;
+  hideStrategySelector?: boolean;
+  initialStrategy?: StrategyType;
 }
 
-const FlipForm: React.FC<FlipFormProps> = ({ onSearch, isLoading }) => {
+const FlipForm: React.FC<FlipFormProps> = ({
+  onSearch,
+  isLoading,
+  hideStrategySelector = false,
+  initialStrategy = StrategyType.FLIPPING
+}) => {
   const [budget, setBudget] = useState<number>(0);
   const [membership, setMembership] = useState<MembershipStatus>(MembershipStatus.P2P);
   const [risk, setRisk] = useState<RiskLevel>(RiskLevel.MEDIUM);
-  const [strategy, setStrategy] = useState<StrategyType>(StrategyType.FLIPPING);
+  const [strategy, setStrategy] = useState<StrategyType>(initialStrategy);
   const [itemName, setItemName] = useState<string>('');
   const [username, setUsername] = useState<string>('');
   const [resultCount, setResultCount] = useState<number>(100);
+
+  // Update strategy if prop changes
+  useEffect(() => {
+    setStrategy(initialStrategy);
+  }, [initialStrategy]);
 
   // Autocomplete state
   const [itemSuggestions, setItemSuggestions] = useState<string[]>([]);
@@ -102,45 +114,36 @@ const FlipForm: React.FC<FlipFormProps> = ({ onSearch, isLoading }) => {
 
       <form onSubmit={handleSubmit} className="space-y-6">
 
-        {/* Strategy Selection */}
-        <div>
-          <label className="block text-osrs-gold mb-2 font-bold">Strategy</label>
-          <div className="grid grid-cols-3 gap-4">
-            <button
-              type="button"
-              onClick={() => setStrategy(StrategyType.FLIPPING)}
-              className={`flex items-center justify-center gap-2 p-3 rounded border transition-all ${strategy === StrategyType.FLIPPING
-                ? 'bg-osrs-gold text-black border-white shadow-[0_0_10px_rgba(212,175,55,0.3)]'
-                : 'bg-black/30 text-gray-400 border-osrs-border hover:border-gray-500'
-                }`}
-            >
-              <TrendingUp className="w-4 h-4" />
-              <span className="font-bold">Merch / Flip</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setStrategy(StrategyType.HIGH_ALCH)}
-              className={`flex items-center justify-center gap-2 p-3 rounded border transition-all ${strategy === StrategyType.HIGH_ALCH
-                ? 'bg-purple-700 text-white border-white shadow-[0_0_10px_rgba(147,51,234,0.3)]'
-                : 'bg-black/30 text-gray-400 border-osrs-border hover:border-gray-500'
-                }`}
-            >
-              <RefreshCcw className="w-4 h-4" />
-              <span className="font-bold">High Alchemy</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setStrategy(StrategyType.PLAYER_LOOKUP)}
-              className={`flex items-center justify-center gap-2 p-3 rounded border transition-all ${strategy === StrategyType.PLAYER_LOOKUP
-                ? 'bg-blue-700 text-white border-white shadow-[0_0_10px_rgba(59,130,246,0.3)]'
-                : 'bg-black/30 text-gray-400 border-osrs-border hover:border-gray-500'
-                }`}
-            >
-              <User className="w-4 h-4" />
-              <span className="font-bold">Player Lookup</span>
-            </button>
+        {/* Strategy Selection - Only show if not hidden */}
+        {!hideStrategySelector && (
+          <div>
+            <label className="block text-osrs-gold mb-2 font-bold">Strategy</label>
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => setStrategy(StrategyType.FLIPPING)}
+                className={`flex items-center justify-center gap-2 p-3 rounded border transition-all ${strategy === StrategyType.FLIPPING
+                  ? 'bg-osrs-gold text-black border-white shadow-[0_0_10px_rgba(212,175,55,0.3)]'
+                  : 'bg-black/30 text-gray-400 border-osrs-border hover:border-gray-500'
+                  }`}
+              >
+                <TrendingUp className="w-4 h-4" />
+                <span className="font-bold">Merch / Flip</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setStrategy(StrategyType.HIGH_ALCH)}
+                className={`flex items-center justify-center gap-2 p-3 rounded border transition-all ${strategy === StrategyType.HIGH_ALCH
+                  ? 'bg-purple-700 text-white border-white shadow-[0_0_10px_rgba(147,51,234,0.3)]'
+                  : 'bg-black/30 text-gray-400 border-osrs-border hover:border-gray-500'
+                  }`}
+              >
+                <RefreshCcw className="w-4 h-4" />
+                <span className="font-bold">High Alchemy</span>
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {strategy === StrategyType.PLAYER_LOOKUP ? (
           // PLAYER LOOKUP MODE
@@ -210,61 +213,63 @@ const FlipForm: React.FC<FlipFormProps> = ({ onSearch, isLoading }) => {
                 </div>
               </div>
 
-              {/* Username (Optional) */}
+              {/* Username (Optional) - Only for High Alch or other modes needing XP calc */}
+              {strategy !== StrategyType.FLIPPING && (
+                <div>
+                  <label className="block text-osrs-gold mb-2 font-bold">
+                    OSRS Name <span className="text-gray-500 font-normal text-xs">(For XP Calc)</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      className="w-full bg-black/30 border border-osrs-border rounded px-4 py-3 text-white focus:outline-none focus:border-osrs-gold transition-colors pl-10"
+                      placeholder="Username"
+                    />
+                    <User className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
+                  </div>
+                </div>
+              )}
+
+              {/* Budget Input */}
               <div>
                 <label className="block text-osrs-gold mb-2 font-bold">
-                  OSRS Name <span className="text-gray-500 font-normal text-xs">(For XP Calc)</span>
+                  Budget (GP) <span className="text-gray-500 font-normal">({formatNumber(budget)})</span>
                 </label>
                 <div className="relative">
                   <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="w-full bg-black/30 border border-osrs-border rounded px-4 py-3 text-white focus:outline-none focus:border-osrs-gold transition-colors pl-10"
-                    placeholder="Username"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={budget}
+                    onChange={(e) => {
+                      setBudget(Number(e.target.value));
+                      if (Number(e.target.value) > 0) setBudgetError(false);
+                    }}
+                    className={`w-full bg-black/30 border rounded px-4 py-3 text-white focus:outline-none transition-colors ${budgetError ? 'border-red-500 focus:border-red-500' : 'border-osrs-border focus:border-osrs-gold'
+                      }`}
+                    placeholder="e.g. 1000000"
                   />
-                  <User className="absolute left-3 top-3 text-gray-500 w-5 h-5" />
+                  <div className="absolute right-3 top-3 text-osrs-gold font-fantasy text-sm">GP</div>
                 </div>
-              </div>
-            </div>
-
-            {/* Budget Input */}
-            <div>
-              <label className="block text-osrs-gold mb-2 font-bold">
-                Budget (GP) <span className="text-gray-500 font-normal">({formatNumber(budget)})</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={budget}
-                  onChange={(e) => {
-                    setBudget(Number(e.target.value));
-                    if (Number(e.target.value) > 0) setBudgetError(false);
-                  }}
-                  className={`w-full bg-black/30 border rounded px-4 py-3 text-white focus:outline-none transition-colors ${budgetError ? 'border-red-500 focus:border-red-500' : 'border-osrs-border focus:border-osrs-gold'
-                    }`}
-                  placeholder="e.g. 1000000"
-                />
-                <div className="absolute right-3 top-3 text-osrs-gold font-fantasy text-sm">GP</div>
-              </div>
-              {budgetError && (
-                <p className="text-red-500 text-xs mt-1 animate-pulse font-bold">
-                  Please enter a budget greater than 0 to continue.
-                </p>
-              )}
-              <div className="flex gap-2 mt-2 flex-wrap">
-                {[1000000, 10000000, 100000000, 500000000, 1000000000].map((amt) => (
-                  <button
-                    type="button"
-                    key={amt}
-                    onClick={() => setBudget(prev => prev + amt)}
-                    className="text-xs bg-osrs-border hover:bg-osrs-gold hover:text-black text-gray-300 px-3 py-1 rounded transition-colors"
-                  >
-                    +{formatNumber(amt)}
-                  </button>
-                ))}
+                {budgetError && (
+                  <p className="text-red-500 text-xs mt-1 animate-pulse font-bold">
+                    Please enter a budget greater than 0 to continue.
+                  </p>
+                )}
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  {[1000000, 10000000, 100000000, 500000000, 1000000000].map((amt) => (
+                    <button
+                      type="button"
+                      key={amt}
+                      onClick={() => setBudget(prev => prev + amt)}
+                      className="text-xs bg-osrs-border hover:bg-osrs-gold hover:text-black text-gray-300 px-3 py-1 rounded transition-colors"
+                    >
+                      +{formatNumber(amt)}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 

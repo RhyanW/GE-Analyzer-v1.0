@@ -65,13 +65,15 @@ const parseStatsCsv = (csv: string): PlayerStats => {
     'ranged', 'prayer', 'magic', 'cooking', 'woodcutting',
     'fletching', 'fishing', 'firemaking', 'crafting', 'smithing',
     'mining', 'herblore', 'agility', 'thieving', 'slayer',
-    'farming', 'runecraft', 'hunter', 'construction'
+    'farming', 'runecraft', 'hunter', 'construction', 'sailing'
   ];
 
   const stats: any = {};
 
   SKILLS.forEach((skill, index) => {
     const line = lines[index];
+    if (!line) return;
+
     const parts = line.split(',');
     if (parts.length >= 3) {
       const [rank, level, xp] = parts.map(val => parseInt(val, 10));
@@ -82,13 +84,6 @@ const parseStatsCsv = (csv: string): PlayerStats => {
       };
     }
   });
-
-  // Manually add Sailing (not yet in API, default to 1)
-  stats['sailing'] = {
-    rank: -1,
-    level: 1,
-    xp: 0
-  };
 
   return stats as PlayerStats;
 };

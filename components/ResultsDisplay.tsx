@@ -372,6 +372,35 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
 
       </div>
 
+      {/* Recommended Sort Explanation - Only show if using Recommended sort */}
+      {sortCriteria.some(c => c.field === 'recommended') && (
+        <div className="bg-black/40 border border-osrs-border/50 rounded-lg p-4 text-sm flex items-start gap-4">
+          <div className="bg-osrs-gold/10 p-2 rounded-full border border-osrs-gold/30 shrink-0">
+            <Calculator className="w-5 h-5 text-osrs-gold" />
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-osrs-gold font-bold">How is "Recommended" Calculated?</h4>
+            <p className="text-gray-400">
+              The AI Score evaluates every item based on a weighted formula to find the safest and most profitable flips:
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-2 mt-2 text-xs text-gray-300">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                <span className="font-bold text-white">ROI Priority:</span> Favors higher margins.
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                <span className="font-bold text-white">Volume Check:</span> Ensures liquidity for quick trades.
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                <span className="font-bold text-white">Stability:</span> Avoids highly volatile "crash" items.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Filter & Sort Controls */}
       {data.parsedItems.length > 0 && (
         <div className={`bg-osrs-panel border-2 border-osrs-border rounded-lg p-4 shadow-lg transition-opacity duration-300 ${isRefreshing ? 'opacity-70 pointer-events-none' : 'opacity-100'}`}>
