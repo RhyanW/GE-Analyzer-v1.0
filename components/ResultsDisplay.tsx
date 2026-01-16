@@ -1,9 +1,10 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { MarketResponseData, StrategyType, PlayerStats, ParsedItem, PriceHistoryPoint } from '../types';
 import { getNextLevelXp, getItemPriceHistory } from '../services/osrs';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area, Brush, ComposedChart, Line, ReferenceLine } from 'recharts';
 import { TrendingUp, TrendingDown, Minus, AlertTriangle, Coins, Box, Filter, XCircle, Sparkles, RefreshCw, Clock, Loader2, ArrowRight, Info, LayoutGrid, List, AlertOctagon, X, Globe, LineChart, Calculator, ArrowUpDown, Plus, ArrowUp, ArrowDown, GripVertical, Maximize2, CircleDot } from 'lucide-react';
+import OrientationNotice from './OrientationNotice';
 
 interface ResultsDisplayProps {
   data: MarketResponseData;
@@ -130,7 +131,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   const [loadingChart, setLoadingChart] = useState(false);
   const [zoomState, setZoomState] = useState<{ startIndex: number; endIndex: number } | null>(null);
   const [timeframe, setTimeframe] = useState<'5m' | '1h' | '6h'>('6h');
-  const [timeRange, setTimeRange] = useState<'All' | 'Year' | 'Quarter' | 'Month' | 'Week' | 'Day' | '12h' | '6h' | '2h'>('2h');
+  const [timeRange, setTimeRange] = useState<'All' | 'Year' | 'Quarter' | 'Month' | 'Week' | 'Day' | '12h' | '6h' | '2h' | '1h' | '30m'>('2h');
   const [isExpanded, setIsExpanded] = useState(false);
   const [showMarkers, setShowMarkers] = useState(true);
 
@@ -146,7 +147,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
 
       // Map timeRange to appropriate API timestep
       let targetTimestep: '5m' | '1h' | '6h' | '24h' = '6h';
-      if (timeRange === '2h' || timeRange === '6h' || timeRange === '12h' || timeRange === 'Day') targetTimestep = '5m';
+      if (['30m', '1h', '2h', '6h', '12h', 'Day'].includes(timeRange)) targetTimestep = '5m';
       else if (timeRange === 'Week') targetTimestep = '1h';
       else if (timeRange === 'Month' || timeRange === 'Quarter') targetTimestep = '6h';
       else if (timeRange === 'Year' || timeRange === 'All') targetTimestep = '24h';
@@ -155,13 +156,39 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
 
       getItemPriceHistory(selectedItem.id, targetTimestep)
         .then(data => {
-          // Filter out data points that don't have both buy and sell prices
-          const validData = data.filter(d => d.avgHighPrice != null && d.avgLowPrice != null);
-          setChartData(validData);
-          setZoomState({ startIndex: 0, endIndex: data.length - 1 });
+          // Calculate cutoff for filtering
+          const now = Math.floor(Date.now() / 1000);
+          let cutoff = 0;
+          if (timeRange === '30m') cutoff = now - 30 * 60;
+          else if (timeRange === '1h') cutoff = now - 60 * 60;
+          else if (timeRange === '2h') cutoff = now - 2 * 3600;
+          else if (timeRange === '6h') cutoff = now - 6 * 3600;
+          else if (timeRange === '12h') cutoff = now - 12 * 3600;
+          else if (timeRange === 'Day') cutoff = now - 24 * 3600;
+          else if (timeRange === 'Week') cutoff = now - 7 * 24 * 3600;
+          else if (timeRange === 'Month') cutoff = now - 30 * 24 * 3600;
+          else if (timeRange === 'Quarter') cutoff = now - 90 * 24 * 3600;
+          else if (timeRange === 'Year') cutoff = now - 365 * 24 * 3600;
+
+          // Sanitize data: Keep prices as null if not present to allow line bridging (connectNulls)
+          const sanitizedData = data
+            .filter(d => cutoff === 0 || d.timestamp >= cutoff)
+            .map(d => ({
+              ...d,
+              avgHighPrice: (d.avgHighPrice && d.avgHighPrice > 0) ? d.avgHighPrice : null,
+              avgLowPrice: (d.avgLowPrice && d.avgLowPrice > 0) ? d.avgLowPrice : null,
+              highPriceVolume: d.highPriceVolume ?? 0,
+              lowPriceVolume: d.lowPriceVolume ?? 0,
+              volume: (d.highPriceVolume ?? 0) + (d.lowPriceVolume ?? 0)
+            }))
+            // Filter out points where NO data exists at all
+            .filter(d => d.avgHighPrice !== null || d.avgLowPrice !== null || d.volume > 0);
+
+          setChartData(sanitizedData);
+          setLoadingChart(false);
+          setZoomState({ startIndex: 0, endIndex: sanitizedData.length - 1 });
         })
-        .catch(err => console.error(err))
-        .finally(() => setLoadingChart(false));
+        .catch(err => console.error(err));
     } else {
       // Restore body scroll
       document.body.style.overflow = 'unset';
@@ -854,19 +881,18 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
         </div>
       )}
 
-      {/* Item Details Modal */}
-      {selectedItem && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedItem(null)}>
+      {selectedItem && createPortal(
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-0 md:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
           <div
-            className="bg-osrs-panel border-2 border-osrs-gold rounded-lg shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden relative"
+            className="bg-[#1e1e1e] border-y-2 lg:border-2 border-osrs-gold rounded-none lg:rounded-lg shadow-2xl w-screen h-screen lg:w-auto lg:h-auto lg:max-w-[70vw] lg:max-h-[90vh] flex flex-col relative overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="p-4 border-b border-osrs-border bg-black/40 flex items-center justify-between">
+            <div className="p-4 border-b border-osrs-border bg-[#2c241b] flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <ItemIcon name={selectedItem.name} id={selectedItem.id} size="lg" />
                 <div>
-                  <h2 className="text-2xl font-fantasy text-osrs-yellow">{selectedItem.name}</h2>
+                  <h2 className="text-2xl font-fantasy text-osrs-gold">{selectedItem.name}</h2>
                   <div className="flex items-center gap-2 mt-1">
                     <span className={`text-xs font-mono px-2 py-0.5 rounded border ${isAlch ? 'text-purple-300 border-purple-800' : 'text-green-500 border-green-900'}`}>
                       {isAlch ? 'High Alchemy Strategy' : 'Flipping Strategy'}
@@ -981,14 +1007,14 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
 
               {/* Price History Chart */}
               <div className="mb-6 bg-black/30 rounded border border-osrs-border p-4">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+                <div className="flex flex-col lg:flex-row justify-between lg:items-center mb-4 gap-4">
                   <h3 className="text-osrs-gold font-fantasy text-lg flex items-center gap-2">
                     <LineChart className="w-5 h-5" /> Price & Volume History
                   </h3>
 
-                  <div className="flex items-center gap-2">
-                    <div className="flex flex-wrap gap-2 bg-black/50 rounded p-1 border border-osrs-border/50">
-                      {(['All', 'Year', 'Quarter', 'Month', 'Week', 'Day', '12h', '6h', '2h'] as const).map((range) => (
+                  <div className="flex items-center gap-2 flex-wrap lg:flex-nowrap">
+                    <div className="flex flex-wrap gap-1 md:gap-2 bg-black/50 rounded p-1 border border-osrs-border/50">
+                      {(['All', 'Year', 'Quarter', 'Month', 'Week', 'Day', '12h', '6h', '2h', '1h', '30m'] as const).map((range) => (
                         <button
                           key={range}
                           onClick={() => setTimeRange(range)}
@@ -998,21 +1024,24 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                         </button>
                       ))}
                     </div>
-                    <button
-                      onClick={() => setShowMarkers(!showMarkers)}
-                      className={`p-1.5 rounded transition-colors ${showMarkers ? 'text-osrs-gold bg-black/50' : 'text-gray-400 hover:text-white hover:bg-black/50'}`}
-                      title={showMarkers ? "Hide Markers" : "Show Markers"}
-                    >
-                      <CircleDot className="w-5 h-5" />
-                    </button>
 
-                    <button
-                      onClick={() => setIsExpanded(true)}
-                      className="p-1.5 text-gray-400 hover:text-osrs-gold hover:bg-black/50 rounded transition-colors"
-                      title="Expand Chart"
-                    >
-                      <Maximize2 className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center gap-2 ml-auto lg:ml-0 bg-black/30 p-1 rounded border border-white/5">
+                      <button
+                        onClick={() => setShowMarkers(!showMarkers)}
+                        className={`p-1.5 rounded transition-colors ${showMarkers ? 'text-osrs-gold bg-black/50' : 'text-gray-400 hover:text-white hover:bg-black/50'}`}
+                        title={showMarkers ? "Hide Markers" : "Show Markers"}
+                      >
+                        <CircleDot className="w-5 h-5" />
+                      </button>
+
+                      <button
+                        onClick={() => setIsExpanded(true)}
+                        className="p-1.5 text-gray-400 hover:text-osrs-gold hover:bg-black/50 rounded transition-colors"
+                        title="Expand Chart"
+                      >
+                        <Maximize2 className="w-5 h-5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1021,10 +1050,10 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                     <Loader2 className="w-5 h-5 animate-spin" /> Fetching market history...
                   </div>
                 ) : chartData.length > 0 ? (
-                  <div className="flex flex-col gap-2" onWheel={(e) => handleWheel(e, chartData.length)}>
-                    <div className="h-64 w-full min-w-0">
+                  <div className="flex flex-col gap-2 min-h-0 min-w-0" onWheel={(e) => handleWheel(e, chartData.length)}>
+                    <div className="h-64 w-full min-w-0 min-h-0">
                       <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={chartData} syncId="priceVolumeSync">
+                        <ComposedChart data={chartData} syncId="priceVolumeSync" margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                           <defs>
                             <linearGradient id="colorHigh" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.1} />
@@ -1045,6 +1074,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                             fontSize={10}
                             tickFormatter={(val) => `${formatK(val)}`}
                             orientation="right"
+                            width={45}
                           />
                           <Tooltip
                             content={({ active, payload, label }) => {
@@ -1058,13 +1088,13 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                                     <div className="flex items-center gap-2 mb-1">
                                       <div className="w-2 h-2 rounded-full bg-[#f59e0b]"></div>
                                       <span className="text-gray-300">Offer Price (High):</span>
-                                      <span className="font-mono">{data.avgHighPrice.toLocaleString()} GP</span>
+                                      <span className="font-mono">{data.avgHighPrice?.toLocaleString()} GP</span>
                                     </div>
 
                                     <div className="flex items-center gap-2">
                                       <div className="w-2 h-2 rounded-full bg-[#3b82f6]"></div>
                                       <span className="text-gray-300">Request Price (Low):</span>
-                                      <span className="font-mono">{data.avgLowPrice.toLocaleString()} GP</span>
+                                      <span className="font-mono">{data.avgLowPrice?.toLocaleString()} GP</span>
                                     </div>
                                   </div>
                                 );
@@ -1102,16 +1132,15 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                               y={selectedItem.guidePrice}
                               stroke="#6b7280"
                               strokeDasharray="3 3"
-                              label={{ position: 'left', value: 'Guide', fill: '#6b7280', fontSize: 10 }}
                             />
                           )}
                         </ComposedChart>
                       </ResponsiveContainer>
                     </div>
 
-                    <div className="h-40 w-full min-w-0">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={chartData} syncId="priceVolumeSync">
+                    <div className="h-40 w-full min-w-0 min-h-0 bg-[#1e1e1e]">
+                      <ResponsiveContainer width="100%" height="100%" debounce={100}>
+                        <ComposedChart data={chartData} syncId="priceVolumeSync" margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#3e3529" vertical={false} opacity={0.5} />
                           <XAxis
                             dataKey="timestamp"
@@ -1132,32 +1161,19 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                             stroke="#6b7280"
                             fontSize={10}
                             tickFormatter={(val) => formatK(val)}
-                            width={40}
+                            width={45}
                           />
                           <Tooltip
                             contentStyle={{ backgroundColor: '#111', borderColor: '#d4af37', color: '#fff', fontSize: '12px' }}
                             labelFormatter={(unixTime) => new Date(unixTime * 1000).toLocaleString()}
                             formatter={(value: number, name: string) => {
-                              if (name === 'volume') return [value.toLocaleString(), 'Combined Volume'];
+                              if (name === 'highPriceVolume') return [value.toLocaleString(), 'Buy Volume'];
+                              if (name === 'lowPriceVolume') return [value.toLocaleString(), 'Sell Volume'];
                               return [value, name];
                             }}
                           />
                           <Bar yAxisId="volume" dataKey="highPriceVolume" name="Buy Volume" stackId="a" fill="#f59e0b" opacity={0.8} isAnimationActive={false} />
                           <Bar yAxisId="volume" dataKey="lowPriceVolume" name="Sell Volume" stackId="a" fill="#3b82f6" opacity={0.8} isAnimationActive={false} />
-                          <Brush
-                            dataKey="timestamp"
-                            height={25}
-                            stroke="#d4af37"
-                            fill="#1e1e1e"
-                            tickFormatter={(unixTime) => new Date(unixTime * 1000).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}
-                            startIndex={zoomState?.startIndex}
-                            endIndex={zoomState?.endIndex}
-                            onChange={(newIndex) => {
-                              if (newIndex && typeof newIndex.startIndex === 'number' && typeof newIndex.endIndex === 'number') {
-                                setZoomState({ startIndex: newIndex.startIndex, endIndex: newIndex.endIndex });
-                              }
-                            }}
-                          />
                         </ComposedChart>
                       </ResponsiveContainer>
                     </div>
@@ -1239,200 +1255,193 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
             </div>
           </div>
         </div>
-      )
-      }
+        , document.body)}
 
       {/* Expanded Chart Modal */}
-      {isExpanded && selectedItem && (
-        <div className="fixed inset-0 flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-in fade-in zoom-in duration-200" style={{ zIndex: 100 }}>
+      {isExpanded && selectedItem && createPortal(
+        <div className="fixed inset-0 flex items-center justify-center p-2 md:p-4 bg-black/95 backdrop-blur-md animate-in fade-in zoom-in duration-200" style={{ zIndex: 2100 }}>
           <div className="bg-[#1e1e1e] border border-osrs-gold rounded-lg shadow-2xl w-full h-full max-w-[98vw] max-h-[95vh] flex flex-col overflow-hidden">
-            {/* Header */}
-            <div className="flex justify-between items-center p-4 border-b border-osrs-border bg-[#2c241b]">
-              <div className="flex items-center gap-3">
-                <ItemIcon name={selectedItem.name} id={selectedItem.id} size="sm" />
-                <h3 className="text-osrs-gold font-fantasy text-2xl tracking-wide">{selectedItem.name} <span className="text-gray-400 text-lg font-sans">| Price & Volume Analysis</span></h3>
+            {/* Header - Two Tiered on Mobile */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between p-3 md:p-4 border-b border-osrs-border bg-[#2c241b] shrink-0 gap-3">
+              {/* Row 1/Left: Item Identity */}
+              <div className="flex items-center justify-between lg:justify-start gap-2 md:gap-3 min-w-0">
+                <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                  <ItemIcon name={selectedItem.name} id={selectedItem.id} size="sm" />
+                  <h3 className="text-osrs-gold font-fantasy text-sm md:text-xl tracking-wide truncate">
+                    {selectedItem.name}
+                    <span className="text-gray-400 text-xs md:text-lg font-sans hidden md:inline ml-2 opacity-50">
+                      | Price & Volume Analysis
+                    </span>
+                  </h3>
+                </div>
+                {/* Mobile-only Close button in top row */}
+                <button
+                  onClick={() => setIsExpanded(false)}
+                  className="lg:hidden p-1.5 hover:bg-white/10 rounded-full transition-colors text-gray-400"
+                >
+                  <X className="w-6 h-6" />
+                </button>
               </div>
-              <div className="flex items-center gap-4">
-                <div className="flex flex-wrap gap-2 bg-black/50 rounded p-1 border border-osrs-border/50">
-                  {(['All', 'Year', 'Quarter', 'Month', 'Week', 'Day', '12h', '6h', '2h'] as const).map((range) => (
+
+              {/* Row 2/Right: Controls */}
+              <div className="flex items-center justify-between lg:justify-end gap-2 md:gap-4 shrink-0">
+                <div className="flex flex-wrap gap-1 md:gap-2 bg-black/50 rounded p-1 border border-osrs-border/50">
+                  {(['All', 'Year', 'Quarter', 'Month', 'Week', 'Day', '12h', '6h', '2h', '1h', '30m'] as const).map((range) => (
                     <button
                       key={range}
                       onClick={() => setTimeRange(range)}
-                      className={`px-4 py-1.5 text-xs font-bold rounded transition-colors ${timeRange === range ? 'bg-osrs-gold text-black' : 'text-gray-400 hover:text-white'}`}
+                      className={`px-2 md:px-3 py-1 text-[10px] md:text-xs font-bold rounded transition-colors whitespace-nowrap ${timeRange === range ? 'bg-osrs-gold text-black' : 'text-gray-400 hover:text-white'}`}
                     >
                       {range}
                     </button>
                   ))}
                 </div>
-                <button
-                  onClick={() => setShowMarkers(!showMarkers)}
-                  className={`p-2 rounded-full transition-colors ${showMarkers ? 'text-osrs-gold bg-white/10' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
-                  title={showMarkers ? "Hide Markers" : "Show Markers"}
-                >
-                  <CircleDot className="w-6 h-6" />
-                </button>
 
-                <button
-                  onClick={() => setIsExpanded(false)}
-                  className="p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white"
-                >
-                  <X className="w-8 h-8" />
-                </button>
+                <div className="flex items-center gap-1 md:gap-2 border-l border-white/10 pl-2 md:pl-4">
+                  <button
+                    onClick={() => setShowMarkers(!showMarkers)}
+                    className={`p-1.5 md:p-2 rounded-full transition-colors ${showMarkers ? 'text-osrs-gold bg-white/10' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
+                    title="Toggle Data Points"
+                  >
+                    <CircleDot className="w-4 h-4 md:w-6 md:h-6" />
+                  </button>
+
+                  <button
+                    onClick={() => setIsExpanded(false)}
+                    className="hidden lg:flex p-1.5 md:p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white"
+                  >
+                    <X className="w-5 h-5 md:w-8 md:h-8" />
+                  </button>
+                </div>
               </div>
             </div>
 
             {/* Content */}
-            <div className="flex-1 p-6 flex flex-col gap-4 overflow-hidden bg-[#111]" onWheel={(e) => handleWheel(e, chartData.length)}>
-              {/* Top: Price Chart */}
-              <div className="flex-1 w-full min-h-0 min-w-0 bg-[#1e1e1e] rounded border border-osrs-border/30 p-2 relative">
-                <div className="absolute top-4 left-4 z-10 bg-black/60 px-2 py-1 rounded text-osrs-gold text-xs font-bold border border-osrs-gold/30">Price History</div>
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={chartData} syncId="expandedSync">
-                    <defs>
-                      <linearGradient id="colorHighExp" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2} />
-                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#3e3529" vertical={false} opacity={0.3} />
-                    <XAxis dataKey="timestamp" type="number" domain={['dataMin', 'dataMax']} hide />
-                    <YAxis
-                      yAxisId="price"
-                      domain={chartYDomain}
-                      stroke="#f59e0b"
-                      fontSize={12}
-                      tickFormatter={(val) => `${formatK(val)}`}
-                      orientation="right"
-                      tick={{ fill: '#9ca3af' }}
-                    />
-                    <Tooltip
-                      content={({ active, payload, label }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload;
-                          return (
-                            <div className="bg-[#111] border border-osrs-gold p-3 text-sm text-white shadow-xl min-w-[200px]">
-                              <p className="font-bold mb-2 border-b border-gray-700 pb-1 text-osrs-gold">{new Date(label * 1000).toLocaleString()}</p>
+            <div className="flex-1 p-3 md:p-6 flex flex-col gap-4 overflow-hidden bg-[#111]" onWheel={(e) => handleWheel(e, chartData.length)}>
+              {loadingChart ? (
+                <div className="flex-1 flex flex-col items-center justify-center gap-4 text-osrs-gold bg-[#1e1e1e] rounded border border-osrs-border/30">
+                  <Loader2 className="w-12 h-12 animate-spin opacity-50" />
+                  <p className="font-fantasy text-xl animate-pulse">Consulting the Grand Exchange Archives...</p>
+                </div>
+              ) : chartData.length > 0 ? (
+                <>
+                  {/* Top: Price Chart */}
+                  <div className="flex-[3] w-full min-h-[250px] min-w-0 min-h-0 bg-[#1e1e1e] rounded border border-osrs-border/30 p-2 relative">
+                    <div className="absolute top-2 left-2 z-10 bg-black/60 px-2 py-0.5 rounded text-osrs-gold text-[10px] font-bold border border-osrs-gold/30">Price History</div>
+                    <div className="w-full h-full min-w-0 min-h-0">
+                      <ResponsiveContainer width="100%" height="100%" debounce={100}>
+                        <ComposedChart data={chartData} syncId="expandedSync">
+                          <defs>
+                            <linearGradient id="colorHighExp" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2} />
+                              <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#3e3529" vertical={false} opacity={0.3} />
+                          <XAxis dataKey="timestamp" type="number" domain={['dataMin', 'dataMax']} hide />
+                          <YAxis
+                            yAxisId="price"
+                            domain={chartYDomain}
+                            stroke="#f59e0b"
+                            fontSize={10}
+                            tickFormatter={(val) => `${formatK(val)}`}
+                            orientation="right"
+                            tick={{ fill: '#9ca3af' }}
+                            width={45}
+                          />
+                          <Tooltip
+                            content={({ active, payload, label }) => {
+                              if (active && payload && payload.length) {
+                                const d = payload[0].payload;
+                                return (
+                                  <div className="bg-[#111] border border-osrs-gold p-2 text-[10px] md:text-sm text-white shadow-xl min-w-[150px]">
+                                    <p className="font-bold mb-1 border-b border-gray-700 pb-1 text-osrs-gold">{new Date(label * 1000).toLocaleString()}</p>
+                                    <div className="flex justify-between gap-4">
+                                      <span className="text-gray-300">Offer:</span>
+                                      <span className="font-mono text-[#f59e0b]">{d.avgHighPrice?.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between gap-4">
+                                      <span className="text-gray-300">Request:</span>
+                                      <span className="font-mono text-[#3b82f6]">{d.avgLowPrice?.toLocaleString()}</span>
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            }}
+                          />
+                          <Line
+                            yAxisId="price"
+                            type="monotone"
+                            dataKey="avgHighPrice"
+                            stroke="#f59e0b"
+                            strokeWidth={2}
+                            dot={showMarkers ? { r: 3, fill: '#f59e0b' } : false}
+                            connectNulls={true}
+                            isAnimationActive={false}
+                          />
+                          <Line
+                            yAxisId="price"
+                            type="monotone"
+                            dataKey="avgLowPrice"
+                            stroke="#3b82f6"
+                            strokeWidth={2}
+                            dot={showMarkers ? { r: 3, fill: '#3b82f6' } : false}
+                            connectNulls={true}
+                            isAnimationActive={false}
+                          />
+                          {selectedItem.guidePrice && (
+                            <ReferenceLine yAxisId="price" y={selectedItem.guidePrice} stroke="#6b7280" strokeDasharray="3 3" />
+                          )}
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
 
-                              <div className="flex items-center justify-between gap-4 mb-1">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-2 h-2 rounded-full bg-[#f59e0b]"></div>
-                                  <span className="text-gray-300">Offer (High):</span>
-                                </div>
-                                <span className="font-mono text-[#f59e0b]">{data.avgHighPrice.toLocaleString()} GP</span>
-                              </div>
-
-                              <div className="flex items-center justify-between gap-4">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-2 h-2 rounded-full bg-[#3b82f6]"></div>
-                                  <span className="text-gray-300">Request (Low):</span>
-                                </div>
-                                <span className="font-mono text-[#3b82f6]">{data.avgLowPrice.toLocaleString()} GP</span>
-                              </div>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    <Line
-                      yAxisId="price"
-                      type="monotone"
-                      dataKey="avgHighPrice"
-                      stroke="#f59e0b"
-                      strokeWidth={4}
-                      dot={showMarkers ? { r: 5, fill: '#f59e0b', strokeWidth: 0 } : false}
-                      connectNulls={true}
-                      activeDot={{ r: 8, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }}
-                      isAnimationActive={false}
-                    />
-                    <Line
-                      yAxisId="price"
-                      type="monotone"
-                      dataKey="avgLowPrice"
-                      stroke="#3b82f6"
-                      strokeWidth={4}
-                      dot={showMarkers ? { r: 5, fill: '#3b82f6', strokeWidth: 0 } : false}
-                      connectNulls={true}
-                      activeDot={{ r: 8, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
-                      isAnimationActive={false}
-                    />
-
-                    {selectedItem.guidePrice && (
-                      <ReferenceLine yAxisId="price" y={selectedItem.guidePrice} stroke="#6b7280" strokeDasharray="3 3" label={{ position: 'left', value: 'Guide', fill: '#6b7280', fontSize: 12 }} />
-                    )}
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Bottom: Volume Chart */}
-              <div className="h-1/4 w-full min-h-[150px] min-w-0 bg-[#1e1e1e] rounded border border-osrs-border/30 p-2 relative">
-                <div className="absolute top-4 left-4 z-10 bg-black/60 px-2 py-1 rounded text-blue-400 text-xs font-bold border border-blue-400/30">Volume History</div>
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={chartData} syncId="expandedSync">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#3e3529" vertical={false} opacity={0.3} />
-                    <XAxis
-                      dataKey="timestamp"
-                      type="number"
-                      domain={['dataMin', 'dataMax']}
-                      tickFormatter={(unixTime) => {
-                        const date = new Date(unixTime * 1000);
-                        // For short ranges (hours), show HH:mm
-                        // For longer ranges, show MMM dd
-                        if (timeRange === '2h' || timeRange === '6h' || timeRange === '12h' || timeRange === 'Day') {
-                          return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                        }
-                        return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-                      }}
-                      stroke="#6b7280"
-                      fontSize={12}
-                    />
-                    <YAxis yAxisId="volume" domain={[0, 'auto']} orientation="right" stroke="#6b7280" fontSize={12} tickFormatter={formatK} width={50} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#000', borderColor: '#d4af37', color: '#fff', fontSize: '14px' }}
-                      labelFormatter={(unixTime) => new Date(unixTime * 1000).toLocaleString()}
-                      formatter={(value: number, name: string) => {
-                        if (name === 'highPriceVolume') return [value.toLocaleString(), 'Buy Volume'];
-                        if (name === 'lowPriceVolume') return [value.toLocaleString(), 'Sell Volume'];
-                        return [value, name];
-                      }}
-                    />
-                    <Bar yAxisId="volume" dataKey="highPriceVolume" name="Buy Volume" stackId="a" fill="#f59e0b" opacity={0.8} isAnimationActive={false} />
-                    <Bar yAxisId="volume" dataKey="lowPriceVolume" name="Sell Volume" stackId="a" fill="#3b82f6" opacity={0.8} isAnimationActive={false} />
-                    <Brush
-                      dataKey="timestamp"
-                      height={30}
-                      stroke="#d4af37"
-                      fill="#1e1e1e"
-                      tickFormatter={(unixTime) => new Date(unixTime * 1000).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}
-                      startIndex={zoomState?.startIndex}
-                      endIndex={zoomState?.endIndex}
-                      onChange={(newIndex) => {
-                        if (newIndex && typeof newIndex.startIndex === 'number' && typeof newIndex.endIndex === 'number') {
-                          setZoomState({ startIndex: newIndex.startIndex, endIndex: newIndex.endIndex });
-                        }
-                      }}
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
+                  {/* Bottom: Volume Chart */}
+                  <div className="flex-1 w-full min-h-[150px] min-w-0 min-h-0 bg-[#1e1e1e] rounded border border-osrs-border/30 p-2 relative">
+                    <div className="absolute top-2 left-2 z-10 bg-black/60 px-2 py-0.5 rounded text-blue-400 text-[10px] font-bold border border-blue-400/30">Volume History</div>
+                    <div className="w-full h-full min-w-0 min-h-0">
+                      <ResponsiveContainer width="100%" height="100%" debounce={100}>
+                        <ComposedChart data={chartData} syncId="expandedSync" margin={{ bottom: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#3e3529" vertical={false} opacity={0.3} />
+                          <XAxis
+                            dataKey="timestamp"
+                            type="number"
+                            domain={['dataMin', 'dataMax']}
+                            tickFormatter={(unixTime) => {
+                              const date = new Date(unixTime * 1000);
+                              if (timeRange === '2h' || timeRange === '6h' || timeRange === 'Day') return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                              return date.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' });
+                            }}
+                            stroke="#6b7280"
+                            fontSize={9}
+                          />
+                          <YAxis yAxisId="volume" domain={[0, 'auto']} orientation="right" stroke="#6b7280" fontSize={9} tickFormatter={formatK} width={45} />
+                          <Bar yAxisId="volume" dataKey="highPriceVolume" name="Buy" stackId="a" fill="#f59e0b" opacity={0.8} isAnimationActive={false} />
+                          <Bar yAxisId="volume" dataKey="lowPriceVolume" name="Sell" stackId="a" fill="#3b82f6" opacity={0.8} isAnimationActive={false} />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-gray-500 italic bg-[#1e1e1e] rounded border border-osrs-border/30">
+                  No historical data available for this timeframe.
+                </div>
+              )}
             </div>
           </div>
         </div>
-      )
-      }
-
-
+        , document.body)}
 
       {/* Main Text Content */}
       <div className={`bg-osrs-panel border border-osrs-border rounded-lg p-6 shadow-xl transition-opacity duration-300 ${isRefreshing ? 'opacity-70' : 'opacity-100'}`}>
-        <p className="text-gray-300 leading-relaxed">
+        <p className="text-gray-300 leading-relaxed italic">
           {data.text}
         </p>
       </div>
-
-      {/* Warning */}
-
-    </div >
+    </div>
   );
 };
 

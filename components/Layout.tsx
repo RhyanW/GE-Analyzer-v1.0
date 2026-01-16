@@ -1,6 +1,7 @@
 import React, { ReactNode } from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { Coins, Anchor, BookOpen, Home } from 'lucide-react';
+import ImmersiveOrientationNotice from './ImmersiveOrientationNotice';
 
 interface LayoutProps {
   children: ReactNode;
@@ -9,6 +10,7 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <div className="min-h-screen bg-osrs-bg text-gray-200 font-body flex flex-col items-center">
+      <ImmersiveOrientationNotice />
       {/* Header */}
       <header className="w-full bg-osrs-panel border-b-2 border-osrs-gold shadow-lg sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3">

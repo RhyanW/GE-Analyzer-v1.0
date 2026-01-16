@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { PlayerStats, SkillData } from '../types';
 import { Trophy, Clock, Star, X, ExternalLink, Calculator, Lock, Calendar, ChevronRight, Settings, Search, ChevronDown } from 'lucide-react';
 import { getNextLevelXp, getXpForLevel, XP_RATES } from '../services/osrs';
 import { SKILL_ACTIONS, SKILL_UNLOCKS, SKILL_PRESETS, WEAPON_DATA, getCombatLevel, UnlockCategory, POPULAR_GOALS, Goal } from '../services/skillData';
+import OrientationNotice from './OrientationNotice';
 
 interface PlayerStatsDisplayProps {
     stats: PlayerStats;
@@ -172,8 +174,8 @@ const PlayerStatsDisplay: React.FC<PlayerStatsDisplayProps> = ({ stats, username
         <div className="flex flex-col gap-4">
             {/* Control Bar & Tabs */}
             <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-osrs-panel border border-osrs-border p-3 rounded-lg shadow-sm">
-                <div className="flex items-center gap-6">
-                    <div className="flex bg-black/40 p-1 rounded-lg border border-white/10">
+                <div className="flex items-center justify-between w-full md:w-auto md:justify-start gap-6">
+                    <div className="flex bg-black/40 p-1 rounded-lg border border-white/10 shrink-0">
                         <button
                             onClick={() => setActiveTab('skills')}
                             className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${activeTab === 'skills' ? 'bg-osrs-gold text-black shadow-lg' : 'text-gray-400 hover:text-white'}`}
@@ -188,13 +190,14 @@ const PlayerStatsDisplay: React.FC<PlayerStatsDisplayProps> = ({ stats, username
                         </button>
                     </div>
 
-                    <div className="text-xl font-bold text-white hidden md:block">
-                        <span className="text-osrs-orange">Combat Level: </span>
+                    <div className="text-base md:text-xl font-bold text-white">
+                        <span className="text-osrs-orange hidden xs:inline">Combat Level: </span>
+                        <span className="text-osrs-orange inline xs:hidden">Cmb: </span>
                         <span className={`${isSimMode && combatLevel !== originalCombatLevel ? 'text-green-400' : 'text-white'}`}>
                             {combatLevel}
                         </span>
                         {isSimMode && combatLevel !== originalCombatLevel && (
-                            <span className="text-xs text-gray-400 ml-2">(Original: {originalCombatLevel})</span>
+                            <span className="text-xs text-gray-400 ml-1 md:ml-2">({originalCombatLevel})</span>
                         )}
                     </div>
                 </div>
@@ -372,9 +375,9 @@ const PlayerStatsDisplay: React.FC<PlayerStatsDisplayProps> = ({ stats, username
             )}
 
             {/* Advanced Skill Detail Modal */}
-            {selectedSkill && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setSelectedSkill(null)}>
-                    <div className="bg-[#1e1e1e] border border-osrs-gold rounded-lg p-6 max-w-5xl w-full shadow-2xl relative overflow-hidden flex flex-col gap-6 pt-12 md:pt-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {selectedSkill && createPortal(
+                <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/90 backdrop-blur-sm p-0 lg:p-4 animate-in fade-in duration-200" onClick={() => setSelectedSkill(null)}>
+                    <div className="bg-[#1e1e1e] border-y-2 lg:border border-osrs-gold rounded-none lg:rounded-lg p-6 lg:max-w-[70vw] w-screen h-screen lg:w-full lg:h-auto shadow-2xl relative overflow-hidden flex flex-col gap-6 pt-12 md:pt-6 lg:max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                         <div className="absolute inset-0 opacity-5 pointer-events-none bg-[url('https://oldschool.runescape.wiki/images/Bank_interface.png')] bg-cover"></div>
 
                         <button
@@ -752,7 +755,7 @@ const PlayerStatsDisplay: React.FC<PlayerStatsDisplayProps> = ({ stats, username
                         </div>
                     </div>
                 </div>
-            )}
+                , document.body)}
         </div>
     );
 };
