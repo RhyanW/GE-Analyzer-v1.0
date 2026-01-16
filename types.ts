@@ -89,6 +89,8 @@ export interface PriceHistoryPoint {
   avgHighPrice: number | null;
   avgLowPrice: number | null;
   volume: number;
+  highPriceVolume?: number;
+  lowPriceVolume?: number;
 }
 
 // Wiki API Types

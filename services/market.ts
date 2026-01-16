@@ -81,16 +81,39 @@ export const analyzeMarket = async (settings: FlipSettings): Promise<MarketRespo
 
     const priceData = prices[item.id];
 
+    // Check if we are in specific search mode
+    const isSpecificItemSearch = settings.itemName && settings.itemName.trim() !== "";
+
     // Basic Validity Checks
-    if (!priceData) continue; // No trade data
-    if (!item.limit) continue; // Unknown limit usually means untradeable or obscure
+
+    // If we have no price data...
+    if (!priceData) {
+      // If we are searching for a specific item, we still want to show it, possibly with guide prices or 0s.
+      if (isSpecificItemSearch) {
+        // Mock price data so we can proceed with 0s
+        // We'll handle the display of "0" or "Unknown" in the UI later based on these values
+      } else {
+        continue; // No trade data, and not searching specific file -> skip
+      }
+    }
+
+    // Prepare prices (use Guide Price as fallback if no real trade data and searching)
+    const currentBuyPrice = priceData ? priceData.low : (isSpecificItemSearch ? item.value : 0);
+    const currentSellPrice = priceData ? priceData.high : (isSpecificItemSearch ? item.value : 0);
+
+    // Unknown limit usually means untradeable or obscure, strictly enforce unless searching
+    if (!isSpecificItemSearch && !item.limit) continue;
 
     // Filter: Price Age (Data Freshness)
-    // Ignore prices older than 1 hour (3600 seconds)
+    // Ignore prices older than 1 hour (3600 seconds) unless searching
     const now = Math.floor(Date.now() / 1000);
     const MAX_AGE = 3600;
-    if (!priceData.highTime || !priceData.lowTime) continue;
-    if ((now - priceData.highTime > MAX_AGE) || (now - priceData.lowTime > MAX_AGE)) continue;
+
+    // If not searching, strictly enforce data freshness
+    if (!isSpecificItemSearch && priceData) {
+      if (!priceData.highTime || !priceData.lowTime) continue;
+      if ((now - priceData.highTime > MAX_AGE) || (now - priceData.lowTime > MAX_AGE)) continue;
+    }
 
     // Strategy Logic
     let buyPrice = 0;
@@ -104,12 +127,14 @@ export const analyzeMarket = async (settings: FlipSettings): Promise<MarketRespo
     // Filter: Budget (Must be able to buy at least 1)
     // We use 'high' as buy price for instant buying, 'low' for patient buying.
     // Conservative estimate: Buy at 'low' (ask), Sell at 'high' (bid)
-    const currentBuyPrice = priceData.low;
-    const currentSellPrice = priceData.high;
 
-    if (!currentBuyPrice || !currentSellPrice) continue;
+    if (isSpecificItemSearch && (!currentBuyPrice || !currentSellPrice)) {
+      // Item exists but has no price (and guide price wasn't helpful or we want to show it anyway)
+      // Allow it to proceed with 0s to show up as "Inactive"
+    } else if (!currentBuyPrice || !currentSellPrice) {
+      continue;
+    }
     // Skip budget check if budget is 0 or if searching for a specific item
-    const isSpecificItemSearch = settings.itemName && settings.itemName.trim() !== "";
     if (!isSpecificItemSearch && settings.budget > 0 && currentBuyPrice > settings.budget) continue;
 
     if (settings.strategy === StrategyType.HIGH_ALCH) {
@@ -135,11 +160,11 @@ export const analyzeMarket = async (settings: FlipSettings): Promise<MarketRespo
 
       // Filter: Suspicious Spread (Scam/Manipulation Protection)
       // If sell price is > 3x buy price, it's likely a scam or dead item
-      if (sellPrice > buyPrice * 3) continue;
+      if (!isSpecificItemSearch && sellPrice > buyPrice * 3) continue;
     }
 
-    // Filter: Minimum Profit
-    if (profit <= 0) continue;
+    // Filter: Minimum Profit (Allow unprofitable items if specifically searching)
+    if (!isSpecificItemSearch && profit <= 0) continue;
 
     // Filter: Minimum ROI (relaxed for specific item searches)
     // Ignore items with < 1% ROI (unless High Alch, where volume matters more)

@@ -132,8 +132,8 @@ export const getPlayerStats = async (username: string): Promise<PlayerStats> => 
 
 const PROXY_URL = 'https://corsproxy.io/?';
 
-export const getItemPriceHistory = async (itemId: number): Promise<PriceHistoryPoint[]> => {
-  const url = `https://prices.runescape.wiki/api/v1/osrs/timeseries?timestep=6h&id=${itemId}`;
+export const getItemPriceHistory = async (itemId: number, timestep: '5m' | '1h' | '6h' | '24h' = '6h'): Promise<PriceHistoryPoint[]> => {
+  const url = `https://prices.runescape.wiki/api/v1/osrs/timeseries?timestep=${timestep}&id=${itemId}`;
   const proxyUrl = `${PROXY_URL}${encodeURIComponent(url)}`;
 
   try {
@@ -147,7 +147,9 @@ export const getItemPriceHistory = async (itemId: number): Promise<PriceHistoryP
       timestamp: entry.timestamp,
       avgHighPrice: entry.avgHighPrice,
       avgLowPrice: entry.avgLowPrice,
-      volume: (entry.highPriceVolume || 0) + (entry.lowPriceVolume || 0)
+      volume: (entry.highPriceVolume || 0) + (entry.lowPriceVolume || 0),
+      highPriceVolume: entry.highPriceVolume || 0,
+      lowPriceVolume: entry.lowPriceVolume || 0
     }));
   } catch (e) {
     console.error("Failed to fetch price history", e);

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PlayerStats, SkillData } from '../types';
 import { getPlayerStats } from '../services/osrs';
 import { QUESTS, DIARIES, Quest, DiaryTask, Requirement } from '../services/questData';
+import { fetchSyncedQuests } from '../services/questSyncService';
 import { Check, X, Search, Loader2, BookOpen, Map, ChevronDown, ChevronUp, Lock, Unlock } from 'lucide-react';
 
 const QuestPlannerPage: React.FC = () => {
@@ -15,33 +16,56 @@ const QuestPlannerPage: React.FC = () => {
     // Track completed quest names and diaries
     const [completedQuests, setCompletedQuests] = useState<string[]>([]);
     const [completedDiaries, setCompletedDiaries] = useState<number[]>([]);
+    const [isSynced, setIsSynced] = useState<boolean>(false);
 
     // Load progress when username changes (and has stats)
     useEffect(() => {
         if (!username) {
             setCompletedQuests([]);
             setCompletedDiaries([]);
+            setIsSynced(false);
             return;
         }
 
-        const normalizedUser = username.toLowerCase();
-        const savedQuests = localStorage.getItem(`quests_${normalizedUser}`);
-        const savedDiaries = localStorage.getItem(`diaries_${normalizedUser}`);
+        const loadData = async () => {
+            const normalizedUser = username.toLowerCase();
 
-        if (savedQuests) setCompletedQuests(JSON.parse(savedQuests));
-        else setCompletedQuests([]); // Reset if new user
+            // 1. Try to fetch from Sync API first
+            const syncedQuests = await fetchSyncedQuests(normalizedUser);
 
-        if (savedDiaries) setCompletedDiaries(JSON.parse(savedDiaries));
-        else setCompletedDiaries([]);
+            if (syncedQuests) {
+                setCompletedQuests(syncedQuests);
+                setIsSynced(true);
+                // We don't overwrite local storage immediately to avoid accidents, 
+                // or maybe we DO want to cache it? Let's keep it in memory for now.
+            } else {
+                // 2. Fallback to Local Storage
+                setIsSynced(false);
+                const savedQuests = localStorage.getItem(`quests_${normalizedUser}`);
+                if (savedQuests) setCompletedQuests(JSON.parse(savedQuests));
+                else setCompletedQuests([]);
+            }
 
-    }, [stats]); // Trigger on stats load (successful search) to ensure we have a valid confirmed user context? 
-    // Actually, trigger on 'stats' is safer to ensure we are looking at a valid loaded profile, 
-    // but the user might want to check boxes before loading stats?
-    // Let's stick to: If stats are loaded, we assume the 'username' input is valid and we load that profile's local checklist.
+            // Diaries currently only local
+            const savedDiaries = localStorage.getItem(`diaries_${normalizedUser}`);
+            if (savedDiaries) setCompletedDiaries(JSON.parse(savedDiaries));
+            else setCompletedDiaries([]);
+        };
+
+        loadData();
+
+    }, [stats]);
 
     const saveData = (newQuests: string[], newDiaries: number[]) => {
         if (!username) return;
         const normalizedUser = username.toLowerCase();
+
+        // If we are in 'Synced' mode, maybe we shouldn't allow manual editing? 
+        // Or manual editing effectively creates a local override?
+        // For simplicity V1: Manual edits always save to local storage, 
+        // but next load might overwrite from API if API is authority.
+        // Let's assume manual edits represent "new progress" not yet synced.
+
         localStorage.setItem(`quests_${normalizedUser}`, JSON.stringify(newQuests));
         localStorage.setItem(`diaries_${normalizedUser}`, JSON.stringify(newDiaries));
     };
@@ -53,8 +77,7 @@ const QuestPlannerPage: React.FC = () => {
         setLoading(true);
         setError(null);
         setStats(null);
-        // We do separate the view state from the 'input' state usually, but here 'username' is the input.
-        // It's fine for now.
+        setIsSynced(false);
 
         try {
             const data = await getPlayerStats(username);
@@ -174,7 +197,20 @@ const QuestPlannerPage: React.FC = () => {
                     </button>
                 </form>
                 {error && <p className="text-red-500 text-sm mt-2 text-center">{error}</p>}
-                {stats && <p className="text-green-400 text-sm mt-2 text-center">Stats loaded for <span className="font-bold text-white">{username}</span></p>}
+                {stats && (
+                    <div className="text-center mt-2">
+                        <p className="text-green-400 text-sm mb-1">Stats loaded for <span className="font-bold text-white">{username}</span></p>
+                        {isSynced ? (
+                            <span className="inline-flex items-center gap-1 bg-blue-600 text-white text-xs px-2 py-1 rounded">
+                                <span>☁️</span> Synced from RuneLite
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center gap-1 bg-gray-700 text-gray-300 text-xs px-2 py-1 rounded">
+                                <span>💾</span> Local Save
+                            </span>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Tabs */}

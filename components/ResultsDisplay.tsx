@@ -2,8 +2,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { MarketResponseData, StrategyType, PlayerStats, ParsedItem, PriceHistoryPoint } from '../types';
 import { getNextLevelXp, getItemPriceHistory } from '../services/osrs';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area, Brush } from 'recharts';
-import { TrendingUp, TrendingDown, Minus, AlertTriangle, Coins, Box, Filter, XCircle, Sparkles, RefreshCw, Clock, Loader2, ArrowRight, Info, LayoutGrid, List, AlertOctagon, X, Globe, LineChart, Calculator, ArrowUpDown, Plus, ArrowUp, ArrowDown, GripVertical } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area, Brush, ComposedChart, Line, ReferenceLine } from 'recharts';
+import { TrendingUp, TrendingDown, Minus, AlertTriangle, Coins, Box, Filter, XCircle, Sparkles, RefreshCw, Clock, Loader2, ArrowRight, Info, LayoutGrid, List, AlertOctagon, X, Globe, LineChart, Calculator, ArrowUpDown, Plus, ArrowUp, ArrowDown, GripVertical, Maximize2, CircleDot } from 'lucide-react';
 
 interface ResultsDisplayProps {
   data: MarketResponseData;
@@ -93,7 +93,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
 
   // Filter State
   const [minLimit, setMinLimit] = useState<number>(0);
-  const [minProfit, setMinProfit] = useState<number>(0);
+  const [minProfit, setMinProfit] = useState<number | ''>('');
   const [maxProfit, setMaxProfit] = useState<string>(''); // Empty string = no max
 
   // Sort State
@@ -129,44 +129,57 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   const [chartData, setChartData] = useState<PriceHistoryPoint[]>([]);
   const [loadingChart, setLoadingChart] = useState(false);
   const [zoomState, setZoomState] = useState<{ startIndex: number; endIndex: number } | null>(null);
+  const [timeframe, setTimeframe] = useState<'5m' | '1h' | '6h'>('6h');
+  const [timeRange, setTimeRange] = useState<'All' | 'Year' | 'Quarter' | 'Month' | 'Week' | 'Day' | '12h' | '6h' | '2h'>('2h');
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showMarkers, setShowMarkers] = useState(true);
 
-  // Fetch chart data when item is selected
+
+  // Fetch chart data when item or timeRange selection changes
   useEffect(() => {
     if (selectedItem) {
       // Lock body scroll
       document.body.style.overflow = 'hidden';
 
       setLoadingChart(true);
-      setChartData([]);
-      try {
-        getItemPriceHistory(selectedItem.id)
-          .then(data => {
-            setChartData(data);
-            setZoomState({ startIndex: 0, endIndex: data.length - 1 });
-          })
-          .catch(err => console.error(err))
-          .finally(() => setLoadingChart(false));
-      } catch (e) {
-        console.warn("Chart data fetch skipped or failed", e);
-        setLoadingChart(false);
-      }
+
+
+      // Map timeRange to appropriate API timestep
+      let targetTimestep: '5m' | '1h' | '6h' | '24h' = '6h';
+      if (timeRange === '2h' || timeRange === '6h' || timeRange === '12h' || timeRange === 'Day') targetTimestep = '5m';
+      else if (timeRange === 'Week') targetTimestep = '1h';
+      else if (timeRange === 'Month' || timeRange === 'Quarter') targetTimestep = '6h';
+      else if (timeRange === 'Year' || timeRange === 'All') targetTimestep = '24h';
+
+      setTimeframe(targetTimestep);
+
+      getItemPriceHistory(selectedItem.id, targetTimestep)
+        .then(data => {
+          // Filter data based on time range if needed (API returns most recent available)
+          // For now, we trust the API timestep to give us a good view
+          setChartData(data);
+          setZoomState({ startIndex: 0, endIndex: data.length - 1 });
+        })
+        .catch(err => console.error(err))
+        .finally(() => setLoadingChart(false));
     } else {
       // Restore body scroll
       document.body.style.overflow = 'unset';
     }
 
-    // Cleanup function to ensure scroll is restored if component unmounts
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [selectedItem]);
+  }, [selectedItem, timeRange]);
 
   // Filter & Sort Logic
+
+
   const displayedItems = useMemo(() => {
     // 1. Filter
     let items = data.parsedItems.filter(item => {
       const passLimit = item.limit >= minLimit;
-      const passMinProfit = item.profit >= minProfit;
+      const passMinProfit = minProfit === '' ? true : item.profit >= minProfit;
       return passLimit && passMinProfit;
     });
 
@@ -240,6 +253,63 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
     return items;
   }, [data.parsedItems, minLimit, minProfit, sortCriteria]);
 
+  /* Chart Statistics Calculation */
+  const chartStats = useMemo(() => {
+    if (chartData.length === 0) return null;
+
+    // Only calculate stats for visible data range
+    const visibleData = zoomState
+      ? chartData.slice(zoomState.startIndex, zoomState.endIndex + 1)
+      : chartData;
+    if (visibleData.length === 0) return null;
+
+    const highPrices = visibleData.map(d => d.avgHighPrice).filter((p): p is number => p !== null);
+    const lowPrices = visibleData.map(d => d.avgLowPrice).filter((p): p is number => p !== null);
+
+    const overallHigh = highPrices.length > 0 ? Math.max(...highPrices) : 0;
+    const overallLow = lowPrices.length > 0 ? Math.min(...lowPrices) : 0;
+
+    const buyingHigh = highPrices.length > 0 ? highPrices[highPrices.length - 1] : 0;
+    const buyingLow = highPrices.length > 0 ? Math.min(...highPrices) : 0;
+
+    const sellingHigh = lowPrices.length > 0 ? Math.max(...lowPrices) : 0;
+    const sellingLow = lowPrices.length > 0 ? lowPrices[lowPrices.length - 1] : 0;
+
+    return {
+      overallHigh,
+      overallLow,
+      buyingHigh,
+      buyingLow,
+      sellingHigh,
+      sellingLow
+    };
+  }, [chartData, zoomState]);
+
+  const visiblePointCount = zoomState ? zoomState.endIndex - zoomState.startIndex + 1 : chartData.length;
+  const shouldRenderDots = showMarkers && visiblePointCount < 100;
+
+  // Calculate dynamic Y-axis domain
+  const chartYDomain = useMemo(() => {
+    if (!chartData || chartData.length === 0) return ['auto', 'auto'];
+
+    const visibleData = zoomState
+      ? chartData.slice(zoomState.startIndex, zoomState.endIndex + 1)
+      : chartData;
+
+    let min = Infinity;
+    let max = -Infinity;
+
+    visibleData.forEach(d => {
+      if (d.avgHighPrice) { min = Math.min(min, d.avgHighPrice); max = Math.max(max, d.avgHighPrice); }
+      if (d.avgLowPrice) { min = Math.min(min, d.avgLowPrice); max = Math.max(max, d.avgLowPrice); }
+    });
+
+    if (min === Infinity || max === -Infinity) return ['auto', 'auto'];
+
+    const padding = (max - min) * 0.05; // 5% padding
+    return [Math.floor(min - padding), Math.ceil(max + padding)];
+  }, [chartData, zoomState]);
+
   // Helper for Max Profit check
   const maxProfitNum = maxProfit === '' ? Infinity : Number(maxProfit);
 
@@ -283,45 +353,41 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
     return <Minus className="w-4 h-4 text-gray-400" />;
   };
 
-  const handleWheel = (e: React.WheelEvent) => {
-    if (!zoomState || chartData.length === 0) return;
+  /* Scroll Zoom Handler */
+  const handleWheel = (e: React.WheelEvent, dataLength: number) => {
+    // Prevent default window scroll when hovering the chart
+    // Note: This often requires a ref and adding a non-passive listener,
+    // but for React synthetic events we can try updating zoom state.
+    // If the chart captures the pointer events, this fires.
 
-    e.preventDefault();
-    e.stopPropagation();
+    if (!zoomState) return;
 
-    const { startIndex, endIndex } = zoomState;
-    const currentRange = endIndex - startIndex;
-    const zoomFactor = 0.1; // 10% zoom per scroll
-    const zoomAmount = Math.max(1, Math.round(currentRange * zoomFactor));
+    const ZOOM_SPEED = Math.max(1, Math.floor(dataLength * 0.05)); // Zoom 5% of visible range
+    const MIN_ZOOM_WINDOW = 10;
 
-    let newStart = startIndex;
-    let newEnd = endIndex;
+    const currentWindowSize = zoomState.endIndex - zoomState.startIndex;
+    const direction = Math.sign(e.deltaY);
 
-    if (e.deltaY < 0) {
+    let newStartIndex = zoomState.startIndex;
+    let newEndIndex = zoomState.endIndex;
+
+    if (direction < 0) {
       // Zoom In
-      newStart = startIndex + zoomAmount;
-      newEnd = endIndex - zoomAmount;
+      if (currentWindowSize > MIN_ZOOM_WINDOW) {
+        const moveAmount = Math.ceil(ZOOM_SPEED / 2);
+        newStartIndex = Math.min(zoomState.startIndex + moveAmount, zoomState.endIndex - MIN_ZOOM_WINDOW);
+        newEndIndex = Math.max(zoomState.endIndex - moveAmount, newStartIndex + MIN_ZOOM_WINDOW);
+      }
     } else {
       // Zoom Out
-      newStart = startIndex - zoomAmount;
-      newEnd = endIndex + zoomAmount;
+      const moveAmount = Math.ceil(ZOOM_SPEED / 2);
+      newStartIndex = Math.max(0, zoomState.startIndex - moveAmount);
+      newEndIndex = Math.min(dataLength - 1, zoomState.endIndex + moveAmount);
     }
 
-    // Clamp values
-    if (newStart < 0) newStart = 0;
-    if (newEnd >= chartData.length) newEnd = chartData.length - 1;
-
-    // Minimum range check (e.g., at least 5 points)
-    if (newEnd - newStart < 5) {
-      // If we hit min range, try to keep centered but don't shrink further
-      const center = Math.floor((startIndex + endIndex) / 2);
-      newStart = center - 2;
-      newEnd = center + 3;
-      if (newStart < 0) { newStart = 0; newEnd = 5; }
-      if (newEnd >= chartData.length) { newEnd = chartData.length - 1; newStart = newEnd - 5; }
+    if (newStartIndex !== zoomState.startIndex || newEndIndex !== zoomState.endIndex) {
+      setZoomState({ startIndex: newStartIndex, endIndex: newEndIndex });
     }
-
-    setZoomState({ startIndex: newStart, endIndex: newEnd });
   };
 
   return (
@@ -454,7 +520,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
               <input
                 type="number"
                 value={minProfit}
-                onChange={(e) => setMinProfit(Number(e.target.value))}
+                onChange={(e) => setMinProfit(e.target.value === '' ? '' : Number(e.target.value))}
                 className="bg-black/30 border border-osrs-border rounded px-3 py-2 text-white text-sm focus:border-osrs-gold outline-none"
                 placeholder="e.g. 100"
               />
@@ -581,7 +647,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
           <XCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />
           <p>No items match your filters.</p>
           <button
-            onClick={() => { setMinLimit(0); setMinProfit(0); setMaxProfit(''); }}
+            onClick={() => { setMinLimit(0); setMinProfit(''); setMaxProfit(''); }}
             className="text-osrs-gold text-sm hover:underline mt-2"
           >
             Clear Filters
@@ -910,61 +976,206 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
 
               {/* Price History Chart */}
               <div className="mb-6 bg-black/30 rounded border border-osrs-border p-4">
-                <h3 className="text-osrs-gold font-fantasy text-lg mb-4 flex items-center gap-2">
-                  <LineChart className="w-5 h-5" /> Price History (Avg High - 6h)
-                </h3>
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+                  <h3 className="text-osrs-gold font-fantasy text-lg flex items-center gap-2">
+                    <LineChart className="w-5 h-5" /> Price & Volume History
+                  </h3>
+
+                  <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap gap-2 bg-black/50 rounded p-1 border border-osrs-border/50">
+                      {(['All', 'Year', 'Quarter', 'Month', 'Week', 'Day', '12h', '6h', '2h'] as const).map((range) => (
+                        <button
+                          key={range}
+                          onClick={() => setTimeRange(range)}
+                          className={`px-3 py-1 text-[10px] font-bold rounded transition-colors ${timeRange === range ? 'bg-osrs-gold text-black' : 'text-gray-400 hover:text-white'}`}
+                        >
+                          {range}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => setShowMarkers(!showMarkers)}
+                      className={`p-1.5 rounded transition-colors ${showMarkers ? 'text-osrs-gold bg-black/50' : 'text-gray-400 hover:text-white hover:bg-black/50'}`}
+                      title={showMarkers ? "Hide Markers" : "Show Markers"}
+                    >
+                      <CircleDot className="w-5 h-5" />
+                    </button>
+
+                    <button
+                      onClick={() => setIsExpanded(true)}
+                      className="p-1.5 text-gray-400 hover:text-osrs-gold hover:bg-black/50 rounded transition-colors"
+                      title="Expand Chart"
+                    >
+                      <Maximize2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
 
                 {loadingChart ? (
-                  <div className="h-48 flex items-center justify-center text-gray-500 gap-2">
-                    <Loader2 className="w-5 h-5 animate-spin" /> Loading historical data...
+                  <div className="h-64 flex items-center justify-center text-gray-500 gap-2">
+                    <Loader2 className="w-5 h-5 animate-spin" /> Fetching market history...
                   </div>
                 ) : chartData.length > 0 ? (
-                  <div className="h-48 w-full" onWheel={handleWheel}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={chartData}>
-                        <defs>
-                          <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#d4af37" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="#d4af37" stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#3e3529" vertical={false} />
-                        <XAxis
-                          dataKey="timestamp"
-                          type="number"
-                          domain={['dataMin', 'dataMax']}
-                          tickFormatter={(unixTime) => new Date(unixTime * 1000).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}
-                          stroke="#6b7280"
-                          fontSize={10}
-                        />
-                        <YAxis
-                          domain={['auto', 'auto']}
-                          stroke="#6b7280"
-                          fontSize={10}
-                          tickFormatter={(val) => `${formatK(val)}`}
-                        />
-                        <Tooltip
-                          contentStyle={{ backgroundColor: '#1e1e1e', borderColor: '#d4af37', color: '#fff' }}
-                          labelFormatter={(unixTime) => new Date(unixTime * 1000).toLocaleDateString() + ' ' + new Date(unixTime * 1000).toLocaleTimeString()}
-                          formatter={(value: number) => [value.toLocaleString() + ' GP', 'Avg High Price']}
-                        />
-                        <Area type="monotone" dataKey="avgHighPrice" stroke="#d4af37" fillOpacity={1} fill="url(#colorPrice)" />
-                        <Brush
-                          dataKey="timestamp"
-                          height={30}
-                          stroke="#d4af37"
-                          fill="#1e1e1e"
-                          tickFormatter={(unixTime) => new Date(unixTime * 1000).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}
-                          startIndex={zoomState?.startIndex}
-                          endIndex={zoomState?.endIndex}
-                          onChange={(newIndex) => {
-                            if (newIndex && typeof newIndex.startIndex === 'number' && typeof newIndex.endIndex === 'number') {
-                              setZoomState({ startIndex: newIndex.startIndex, endIndex: newIndex.endIndex });
-                            }
-                          }}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
+                  <div className="flex flex-col gap-2" onWheel={(e) => handleWheel(e, chartData.length)}>
+                    <div className="h-64 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart data={chartData} syncId="priceVolumeSync">
+                          <defs>
+                            <linearGradient id="colorHigh" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.1} />
+                              <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#3e3529" vertical={false} opacity={0.5} />
+                          <XAxis
+                            dataKey="timestamp"
+                            type="number"
+                            domain={['dataMin', 'dataMax']}
+                            hide
+                          />
+                          <YAxis
+                            yAxisId="price"
+                            domain={chartYDomain}
+                            stroke="#f59e0b"
+                            fontSize={10}
+                            tickFormatter={(val) => `${formatK(val)}`}
+                            orientation="right"
+                          />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: '#111', borderColor: '#d4af37', color: '#fff', fontSize: '12px' }}
+                            labelFormatter={(unixTime) => new Date(unixTime * 1000).toLocaleString()}
+                            formatter={(value: number, name: string) => {
+                              if (value === undefined || value === null) return [null, null]; // Hide invalid entries
+                              if (name === 'avgHighPrice') return [value.toLocaleString() + ' GP', 'Offer Price (High)'];
+                              if (name === 'avgLowPrice') return [value.toLocaleString() + ' GP', 'Request Price (Low)'];
+                              return [value, name];
+                            }}
+                          />
+                          <Line
+                            yAxisId="price"
+                            type="monotone"
+                            dataKey="avgHighPrice"
+                            stroke="#f59e0b"
+                            strokeWidth={3}
+                            dot={shouldRenderDots ? { r: 4, fill: '#f59e0b', strokeWidth: 0 } : false}
+                            connectNulls={true}
+                            activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }}
+                            isAnimationActive={false}
+                          />
+                          <Line
+                            yAxisId="price"
+                            type="monotone"
+                            dataKey="avgLowPrice"
+                            stroke="#3b82f6"
+                            strokeWidth={3}
+                            dot={shouldRenderDots ? { r: 4, fill: '#3b82f6', strokeWidth: 0 } : false}
+                            connectNulls={true}
+                            activeDot={{ r: 6, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
+                            isAnimationActive={false}
+                          />
+
+
+                          {selectedItem.guidePrice && (
+                            <ReferenceLine
+                              yAxisId="price"
+                              y={selectedItem.guidePrice}
+                              stroke="#6b7280"
+                              strokeDasharray="3 3"
+                              label={{ position: 'left', value: 'Guide', fill: '#6b7280', fontSize: 10 }}
+                            />
+                          )}
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    <div className="h-40 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart data={chartData} syncId="priceVolumeSync">
+                          <CartesianGrid strokeDasharray="3 3" stroke="#3e3529" vertical={false} opacity={0.5} />
+                          <XAxis
+                            dataKey="timestamp"
+                            type="number"
+                            domain={['dataMin', 'dataMax']}
+                            tickFormatter={(unixTime) => {
+                              const date = new Date(unixTime * 1000);
+                              if (timeRange === '2h' || timeRange === '6h' || timeRange === '12h' || timeRange === 'Day') return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                              return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                            }}
+                            stroke="#6b7280"
+                            fontSize={10}
+                          />
+                          <YAxis
+                            yAxisId="volume"
+                            domain={[0, 'auto']}
+                            orientation="right"
+                            stroke="#6b7280"
+                            fontSize={10}
+                            tickFormatter={(val) => formatK(val)}
+                            width={40}
+                          />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: '#111', borderColor: '#d4af37', color: '#fff', fontSize: '12px' }}
+                            labelFormatter={(unixTime) => new Date(unixTime * 1000).toLocaleString()}
+                            formatter={(value: number, name: string) => {
+                              if (name === 'volume') return [value.toLocaleString(), 'Combined Volume'];
+                              return [value, name];
+                            }}
+                          />
+                          <Bar yAxisId="volume" dataKey="highPriceVolume" name="Buy Volume" stackId="a" fill="#f59e0b" opacity={0.8} isAnimationActive={false} />
+                          <Bar yAxisId="volume" dataKey="lowPriceVolume" name="Sell Volume" stackId="a" fill="#3b82f6" opacity={0.8} isAnimationActive={false} />
+                          <Brush
+                            dataKey="timestamp"
+                            height={25}
+                            stroke="#d4af37"
+                            fill="#1e1e1e"
+                            tickFormatter={(unixTime) => new Date(unixTime * 1000).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}
+                            startIndex={zoomState?.startIndex}
+                            endIndex={zoomState?.endIndex}
+                            onChange={(newIndex) => {
+                              if (newIndex && typeof newIndex.startIndex === 'number' && typeof newIndex.endIndex === 'number') {
+                                setZoomState({ startIndex: newIndex.startIndex, endIndex: newIndex.endIndex });
+                              }
+                            }}
+                          />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Stats Summary Table */}
+                    {chartStats ? (
+                      <div className="bg-black/40 border border-osrs-border/30 rounded-lg overflow-hidden shadow-inner">
+                        <div className="grid grid-cols-3 text-center border-b border-osrs-border/30">
+                          <div className="p-3 border-r border-osrs-border/30">
+                            <span className="text-[10px] text-gray-500 uppercase block mb-1">Overall High</span>
+                            <span className="text-sm font-mono text-white">{chartStats.overallHigh.toLocaleString()}</span>
+                          </div>
+                          <div className="p-3 border-r border-osrs-border/30">
+                            <span className="text-[10px] text-gray-500 uppercase block mb-1">Buying High</span>
+                            <span className="text-sm font-mono text-white">{chartStats.buyingHigh.toLocaleString()}</span>
+                          </div>
+                          <div className="p-3">
+                            <span className="text-[10px] text-gray-500 uppercase block mb-1">Selling High</span>
+                            <span className="text-sm font-mono text-white">{chartStats.sellingHigh.toLocaleString()}</span>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 text-center">
+                          <div className="p-3 border-r border-osrs-border/30">
+                            <span className="text-[10px] text-gray-500 uppercase block mb-1">Overall Low</span>
+                            <span className="text-sm font-mono text-white font-bold text-osrs-orange">{chartStats.overallLow.toLocaleString()}</span>
+                          </div>
+                          <div className="p-3 border-r border-osrs-border/30">
+                            <span className="text-[10px] text-gray-500 uppercase block mb-1">Buying Low</span>
+                            <span className="text-sm font-mono text-white font-bold text-osrs-orange">{chartStats.buyingLow.toLocaleString()}</span>
+                          </div>
+                          <div className="p-3">
+                            <span className="text-[10px] text-gray-500 uppercase block mb-1">Selling Low</span>
+                            <span className="text-sm font-mono text-white font-bold text-osrs-orange">{chartStats.sellingLow.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center text-gray-500 p-4">No statistical data available for the current range.</div>
+                    )}
                   </div>
                 ) : (
                   <div className="h-48 flex items-center justify-center text-gray-500 italic">
@@ -1003,11 +1214,172 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
 
             {/* Modal Footer */}
             <div className="p-4 border-t border-osrs-border bg-black/40 text-xs text-gray-500 text-center">
-              Prices are estimates based on search data. Always verify before trading.
+              Prices are estimates based on {timeframe === '5m' ? '5-minute' : '6-hour'} Wiki data intervals. Always verify before trading.
             </div>
           </div>
         </div>
-      )}
+      )
+      }
+
+      {/* Expanded Chart Modal */}
+      {isExpanded && selectedItem && (
+        <div className="fixed inset-0 flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-in fade-in zoom-in duration-200" style={{ zIndex: 100 }}>
+          <div className="bg-[#1e1e1e] border border-osrs-gold rounded-lg shadow-2xl w-full h-full max-w-[98vw] max-h-[95vh] flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="flex justify-between items-center p-4 border-b border-osrs-border bg-[#2c241b]">
+              <div className="flex items-center gap-3">
+                <ItemIcon name={selectedItem.name} id={selectedItem.id} size="sm" />
+                <h3 className="text-osrs-gold font-fantasy text-2xl tracking-wide">{selectedItem.name} <span className="text-gray-400 text-lg font-sans">| Price & Volume Analysis</span></h3>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex flex-wrap gap-2 bg-black/50 rounded p-1 border border-osrs-border/50">
+                  {(['All', 'Year', 'Quarter', 'Month', 'Week', 'Day', '12h', '6h', '2h'] as const).map((range) => (
+                    <button
+                      key={range}
+                      onClick={() => setTimeRange(range)}
+                      className={`px-4 py-1.5 text-xs font-bold rounded transition-colors ${timeRange === range ? 'bg-osrs-gold text-black' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      {range}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setShowMarkers(!showMarkers)}
+                  className={`p-2 rounded-full transition-colors ${showMarkers ? 'text-osrs-gold bg-white/10' : 'text-gray-400 hover:text-white hover:bg-white/10'}`}
+                  title={showMarkers ? "Hide Markers" : "Show Markers"}
+                >
+                  <CircleDot className="w-6 h-6" />
+                </button>
+
+                <button
+                  onClick={() => setIsExpanded(false)}
+                  className="p-2 hover:bg-white/10 rounded-full transition-colors text-gray-400 hover:text-white"
+                >
+                  <X className="w-8 h-8" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 p-6 flex flex-col gap-4 overflow-hidden bg-[#111]" onWheel={(e) => handleWheel(e, chartData.length)}>
+              {/* Top: Price Chart */}
+              <div className="flex-1 w-full min-h-0 bg-[#1e1e1e] rounded border border-osrs-border/30 p-2 relative">
+                <div className="absolute top-4 left-4 z-10 bg-black/60 px-2 py-1 rounded text-osrs-gold text-xs font-bold border border-osrs-gold/30">Price History</div>
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={chartData} syncId="expandedSync">
+                    <defs>
+                      <linearGradient id="colorHighExp" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2} />
+                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#3e3529" vertical={false} opacity={0.3} />
+                    <XAxis dataKey="timestamp" type="number" domain={['dataMin', 'dataMax']} hide />
+                    <YAxis
+                      yAxisId="price"
+                      domain={chartYDomain}
+                      stroke="#f59e0b"
+                      fontSize={12}
+                      tickFormatter={(val) => `${formatK(val)}`}
+                      orientation="right"
+                      tick={{ fill: '#9ca3af' }}
+                    />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#000', borderColor: '#d4af37', color: '#fff', fontSize: '14px' }}
+                      labelFormatter={(unixTime) => new Date(unixTime * 1000).toLocaleString()}
+                      formatter={(value: number, name: string) => {
+                        if (value === undefined || value === null) return [null, null]; // Hide invalid entries
+                        if (name === 'avgHighPrice') return [value.toLocaleString() + ' GP', 'Offer Price (High)'];
+                        if (name === 'avgLowPrice') return [value.toLocaleString() + ' GP', 'Request Price (Low)'];
+                        return [value, name];
+                      }}
+                    />
+                    <Line
+                      yAxisId="price"
+                      type="monotone"
+                      dataKey="avgHighPrice"
+                      stroke="#f59e0b"
+                      strokeWidth={4}
+                      dot={showMarkers ? { r: 5, fill: '#f59e0b', strokeWidth: 0 } : false}
+                      connectNulls={true}
+                      activeDot={{ r: 8, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }}
+                      isAnimationActive={false}
+                    />
+                    <Line
+                      yAxisId="price"
+                      type="monotone"
+                      dataKey="avgLowPrice"
+                      stroke="#3b82f6"
+                      strokeWidth={4}
+                      dot={showMarkers ? { r: 5, fill: '#3b82f6', strokeWidth: 0 } : false}
+                      connectNulls={true}
+                      activeDot={{ r: 8, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
+                      isAnimationActive={false}
+                    />
+
+                    {selectedItem.guidePrice && (
+                      <ReferenceLine yAxisId="price" y={selectedItem.guidePrice} stroke="#6b7280" strokeDasharray="3 3" label={{ position: 'left', value: 'Guide', fill: '#6b7280', fontSize: 12 }} />
+                    )}
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Bottom: Volume Chart */}
+              <div className="h-1/4 w-full min-h-[150px] bg-[#1e1e1e] rounded border border-osrs-border/30 p-2 relative">
+                <div className="absolute top-4 left-4 z-10 bg-black/60 px-2 py-1 rounded text-blue-400 text-xs font-bold border border-blue-400/30">Volume History</div>
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={chartData} syncId="expandedSync">
+                    <CartesianGrid strokeDasharray="3 3" stroke="#3e3529" vertical={false} opacity={0.3} />
+                    <XAxis
+                      dataKey="timestamp"
+                      type="number"
+                      domain={['dataMin', 'dataMax']}
+                      tickFormatter={(unixTime) => {
+                        const date = new Date(unixTime * 1000);
+                        // For short ranges (hours), show HH:mm
+                        // For longer ranges, show MMM dd
+                        if (timeRange === '2h' || timeRange === '6h' || timeRange === '12h' || timeRange === 'Day') {
+                          return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        }
+                        return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+                      }}
+                      stroke="#6b7280"
+                      fontSize={12}
+                    />
+                    <YAxis yAxisId="volume" domain={[0, 'auto']} orientation="right" stroke="#6b7280" fontSize={12} tickFormatter={formatK} width={50} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#000', borderColor: '#d4af37', color: '#fff', fontSize: '14px' }}
+                      labelFormatter={(unixTime) => new Date(unixTime * 1000).toLocaleString()}
+                      formatter={(value: number, name: string) => {
+                        if (name === 'highPriceVolume') return [value.toLocaleString(), 'Buy Volume'];
+                        if (name === 'lowPriceVolume') return [value.toLocaleString(), 'Sell Volume'];
+                        return [value, name];
+                      }}
+                    />
+                    <Bar yAxisId="volume" dataKey="highPriceVolume" name="Buy Volume" stackId="a" fill="#f59e0b" opacity={0.8} isAnimationActive={false} />
+                    <Bar yAxisId="volume" dataKey="lowPriceVolume" name="Sell Volume" stackId="a" fill="#3b82f6" opacity={0.8} isAnimationActive={false} />
+                    <Brush
+                      dataKey="timestamp"
+                      height={30}
+                      stroke="#d4af37"
+                      fill="#1e1e1e"
+                      tickFormatter={(unixTime) => new Date(unixTime * 1000).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}
+                      startIndex={zoomState?.startIndex}
+                      endIndex={zoomState?.endIndex}
+                      onChange={(newIndex) => {
+                        if (newIndex && typeof newIndex.startIndex === 'number' && typeof newIndex.endIndex === 'number') {
+                          setZoomState({ startIndex: newIndex.startIndex, endIndex: newIndex.endIndex });
+                        }
+                      }}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+      }
 
 
 
@@ -1020,7 +1392,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
 
       {/* Warning */}
 
-    </div>
+    </div >
   );
 };
 

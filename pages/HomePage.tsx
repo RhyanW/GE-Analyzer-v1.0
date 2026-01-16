@@ -45,19 +45,6 @@ const HomePage: React.FC = () => {
                     </p>
                 </div>
 
-                {/* Skill Analyzer Card */}
-                <div
-                    onClick={() => navigate('/skills')}
-                    className="bg-osrs-panel border-2 border-osrs-border p-6 rounded-lg cursor-pointer hover:border-osrs-gold hover:shadow-[0_0_20px_rgba(255,215,0,0.15)] transition-all group flex flex-col items-center text-center"
-                >
-                    <div className="p-4 bg-osrs-bg border border-osrs-border rounded-full mb-4 group-hover:scale-110 transition-transform">
-                        <BookOpen className="w-12 h-12 text-blue-400" />
-                    </div>
-                    <h3 className="text-2xl font-bold text-white mb-2">Skill Analyzer</h3>
-                    <p className="text-gray-400 text-sm">
-                        Track player stats, plan unlocks, and calculate XP efficiency for every skill.
-                    </p>
-                </div>
 
                 {/* Quest Planner Card */}
                 <div
