@@ -45,20 +45,20 @@ const HomePage: React.FC = () => {
                     </p>
                 </div>
 
-
-                {/* Quest Planner Card */}
+                {/* Skill Analyzer Card */}
                 <div
-                    onClick={() => navigate('/quests')}
-                    className="bg-osrs-panel border-2 border-osrs-border p-6 rounded-lg cursor-pointer hover:border-green-400 hover:shadow-[0_0_20px_rgba(74,222,128,0.25)] transition-all group flex flex-col items-center text-center"
+                    onClick={() => navigate('/skills')}
+                    className="bg-osrs-panel border-2 border-osrs-border p-6 rounded-lg cursor-pointer hover:border-osrs-gold hover:shadow-[0_0_20px_rgba(255,215,0,0.15)] transition-all group flex flex-col items-center text-center"
                 >
                     <div className="p-4 bg-osrs-bg border border-osrs-border rounded-full mb-4 group-hover:scale-110 transition-transform">
-                        <span className="text-4xl">📜</span>
+                        <BookOpen className="w-12 h-12 text-blue-400" />
                     </div>
-                    <h3 className="text-2xl font-bold text-white mb-2">Quest Planner</h3>
+                    <h3 className="text-2xl font-bold text-white mb-2">Skill Analyzer</h3>
                     <p className="text-gray-400 text-sm">
-                        Track your progress towards major Quests and Achievement Diaries.
+                        Track player stats, plan unlocks, and calculate XP efficiency for every skill.
                     </p>
                 </div>
+
 
             </div>
 

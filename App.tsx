@@ -3,9 +3,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
 import GEFlipperPage from './pages/GEFlipperPage';
+import SkillAnalyzerPage from './pages/SkillAnalyzerPage';
 
 import HighAlchemyPage from './pages/HighAlchemyPage';
-import QuestPlannerPage from './pages/QuestPlannerPage';
+
 
 const App: React.FC = () => {
   return (
@@ -14,8 +15,7 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/flipper" element={<GEFlipperPage />} />
-          <Route path="/alchemy" element={<HighAlchemyPage />} />
-          <Route path="/quests" element={<QuestPlannerPage />} />
+          <Route path="/skills" element={<SkillAnalyzerPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
