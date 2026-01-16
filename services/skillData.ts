@@ -13,10 +13,17 @@ export interface SkillUnlock {
     category: UnlockCategory;
 }
 
+export interface ItemRequirement {
+    id: number;
+    qty: number;
+    type: 'input' | 'output';
+}
+
 export interface SkillPreset {
     name: string;
     xpRate: number;
     xpPerAction?: number;
+    requirements?: ItemRequirement[];
 }
 
 export interface WeaponData {
@@ -446,14 +453,14 @@ export const SKILL_PRESETS: Partial<Record<keyof PlayerStats, SkillPreset[]>> = 
         { name: 'Enchant Bolts (Onyx)', xpRate: 200000, xpPerAction: 97 }
     ],
     prayer: [
-        { name: 'Big Bones (Gilded Altar)', xpRate: 50000, xpPerAction: 52.5 },
-        { name: 'Dragon Bones (Gilded Altar)', xpRate: 250000, xpPerAction: 252 },
-        { name: 'Dragon Bones (Chaos Altar)', xpRate: 500000, xpPerAction: 504 }, // Effective XP
-        { name: 'Superior Dragon Bones (Gilded)', xpRate: 400000, xpPerAction: 525 },
+        { name: 'Big Bones (Gilded Altar)', xpRate: 50000, xpPerAction: 52.5, requirements: [{ id: 532, qty: 1, type: 'input' }] },
+        { name: 'Dragon Bones (Gilded Altar)', xpRate: 250000, xpPerAction: 252, requirements: [{ id: 536, qty: 1, type: 'input' }] },
+        { name: 'Dragon Bones (Chaos Altar)', xpRate: 500000, xpPerAction: 504, requirements: [{ id: 536, qty: 1, type: 'input' }] }, // Effective XP
+        { name: 'Superior Dragon Bones (Gilded)', xpRate: 400000, xpPerAction: 525, requirements: [{ id: 22124, qty: 1, type: 'input' }] },
         { name: 'Superior Dragon Bones (Chaos)', xpRate: 800000, xpPerAction: 1050 }, // Effective XP
         { name: 'Wyrm Bones', xpRate: 150000, xpPerAction: 175 },
         { name: 'Hydra Bones', xpRate: 350000, xpPerAction: 385 },
-        { name: 'Dagannoth Bones', xpRate: 300000, xpPerAction: 437.5 },
+        { name: 'Dagannoth Bones', xpRate: 300000, xpPerAction: 437.5, requirements: [{ id: 6729, qty: 1, type: 'input' }] },
         { name: 'Lava Dragon Bones', xpRate: 280000, xpPerAction: 297.5 },
         { name: 'Ensouled Dragon Heads', xpRate: 350000, xpPerAction: 1560 }
     ],
@@ -461,7 +468,7 @@ export const SKILL_PRESETS: Partial<Record<keyof PlayerStats, SkillPreset[]>> = 
         { name: 'Wines', xpRate: 480000, xpPerAction: 200 },
         { name: 'Karambwans (1-tick)', xpRate: 900000, xpPerAction: 190 },
         { name: 'Karambwans (AFK)', xpRate: 250000, xpPerAction: 190 },
-        { name: 'Sharks', xpRate: 280000, xpPerAction: 210 },
+        { name: 'Sharks', xpRate: 280000, xpPerAction: 210, requirements: [{ id: 383, qty: 1, type: 'input' }, { id: 385, qty: 1, type: 'output' }] },
         { name: 'Anglerfish', xpRate: 320000, xpPerAction: 230 },
         { name: 'Dark Crabs', xpRate: 350000, xpPerAction: 215 },
         { name: 'Manta Rays', xpRate: 300000, xpPerAction: 216 }
@@ -512,7 +519,7 @@ export const SKILL_PRESETS: Partial<Record<keyof PlayerStats, SkillPreset[]>> = 
         { name: 'Cutting Rubies', xpRate: 110000, xpPerAction: 85 }
     ],
     smithing: [
-        { name: 'Blast Furnace (Gold)', xpRate: 350000, xpPerAction: 56.2 },
+        { name: 'Blast Furnace (Gold)', xpRate: 350000, xpPerAction: 56.2, requirements: [{ id: 444, qty: 1, type: 'input' }, { id: 2357, qty: 1, type: 'output' }] },
         { name: 'Blast Furnace (Mithril)', xpRate: 100000, xpPerAction: 30 },
         { name: 'Blast Furnace (Adamant)', xpRate: 90000, xpPerAction: 37.5 },
         { name: 'Blast Furnace (Runite)', xpRate: 100000, xpPerAction: 50 },
@@ -533,7 +540,7 @@ export const SKILL_PRESETS: Partial<Record<keyof PlayerStats, SkillPreset[]>> = 
         { name: 'Shooting Stars', xpRate: 25000, xpPerAction: 100 } // Avg
     ],
     herblore: [
-        { name: 'Prayer Potions', xpRate: 220000, xpPerAction: 87.5 },
+        { name: 'Prayer Potions', xpRate: 220000, xpPerAction: 87.5, requirements: [{ id: 258, qty: 1, type: 'input' }, { id: 231, qty: 1, type: 'input' }, { id: 227, qty: 1, type: 'input' }, { id: 139, qty: 1, type: 'output' }] },
         { name: 'Super Attack', xpRate: 200000, xpPerAction: 100 },
         { name: 'Super Strength', xpRate: 230000, xpPerAction: 125 },
         { name: 'Super Defence', xpRate: 260000, xpPerAction: 150 },
@@ -825,3 +832,96 @@ export const getCombatLevel = (stats: PlayerStats): number => {
     const mage = 0.325 * (Math.floor(stats.magic.level / 2) + stats.magic.level);
     return Math.floor(base + Math.max(melee, range, mage));
 };
+
+export interface GoalRequirement {
+    skill: keyof PlayerStats;
+    level: number;
+}
+
+export interface Goal {
+    name: string;
+    description: string;
+    requirements: GoalRequirement[];
+    type: 'Quest' | 'Diary' | 'Combat';
+}
+
+export const POPULAR_GOALS: Goal[] = [
+    {
+        name: 'Recipe for Disaster (Barrows Gloves)',
+        description: 'The ultimate glove upgrade for almost every build.',
+        type: 'Quest',
+        requirements: [
+            { skill: 'cooking', level: 70 },
+            { skill: 'agility', level: 48 },
+            { skill: 'mining', level: 50 },
+            { skill: 'fishing', level: 53 },
+            { skill: 'thieving', level: 53 },
+            { skill: 'herblore', level: 25 },
+            { skill: 'magic', level: 59 },
+            { skill: 'smithing', level: 40 },
+            { skill: 'firemaking', level: 50 },
+            { skill: 'ranged', level: 40 },
+            { skill: 'crafting', level: 40 },
+            { skill: 'slayer', level: 10 },
+            { skill: 'fletching', level: 5 },
+            { skill: 'woodcutting', level: 36 }
+        ]
+    },
+    {
+        name: 'Desert Treasure II (Ancient Curses)',
+        description: 'Unlocks Ancient Curses and elite bossing.',
+        type: 'Quest',
+        requirements: [
+            { skill: 'firemaking', level: 75 },
+            { skill: 'magic', level: 75 },
+            { skill: 'thieving', level: 70 },
+            { skill: 'herblore', level: 62 },
+            { skill: 'agility', level: 60 },
+            { skill: 'mining', level: 60 },
+            { skill: 'slayer', level: 60 }
+        ]
+    },
+    {
+        name: 'Song of the Elves (Prifddinas)',
+        description: 'Unlocks the Elven city, Gauntlet, and Zalcano.',
+        type: 'Quest',
+        requirements: [
+            { skill: 'agility', level: 70 },
+            { skill: 'construction', level: 70 },
+            { skill: 'farming', level: 70 },
+            { skill: 'herblore', level: 70 },
+            { skill: 'hunter', level: 70 },
+            { skill: 'mining', level: 70 },
+            { skill: 'smithing', level: 70 },
+            { skill: 'woodcutting', level: 70 }
+        ]
+    },
+    {
+        name: 'Dragon Slayer II (Myth\'s Guild)',
+        description: 'Unlocks Vorkath and the Ava\'s Assembler.',
+        type: 'Quest',
+        requirements: [
+            { skill: 'magic', level: 75 },
+            { skill: 'smithing', level: 70 },
+            { skill: 'mining', level: 68 },
+            { skill: 'crafting', level: 62 },
+            { skill: 'agility', level: 60 },
+            { skill: 'thieving', level: 60 },
+            { skill: 'construction', level: 50 }
+        ]
+    },
+    {
+        name: 'Sins of the Father (Darkmeyre)',
+        description: 'Unlocks Darkmeyer, Vyrewatch Sentinels, and Sepulchre floor 4/5.',
+        type: 'Quest',
+        requirements: [
+            { skill: 'construction', level: 49 },
+            { skill: 'crafting', level: 49 },
+            { skill: 'fletching', level: 50 },
+            { skill: 'herblore', level: 50 },
+            { skill: 'magic', level: 49 },
+            { skill: 'slayer', level: 50 },
+            { skill: 'woodcutting', level: 62 }
+        ]
+    }
+];

@@ -15,6 +15,7 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/flipper" element={<GEFlipperPage />} />
+          <Route path="/alchemy" element={<HighAlchemyPage />} />
           <Route path="/skills" element={<SkillAnalyzerPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

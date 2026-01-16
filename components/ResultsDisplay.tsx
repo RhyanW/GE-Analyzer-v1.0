@@ -155,9 +155,9 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
 
       getItemPriceHistory(selectedItem.id, targetTimestep)
         .then(data => {
-          // Filter data based on time range if needed (API returns most recent available)
-          // For now, we trust the API timestep to give us a good view
-          setChartData(data);
+          // Filter out data points that don't have both buy and sell prices
+          const validData = data.filter(d => d.avgHighPrice != null && d.avgLowPrice != null);
+          setChartData(validData);
           setZoomState({ startIndex: 0, endIndex: data.length - 1 });
         })
         .catch(err => console.error(err))
@@ -439,33 +439,6 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
       </div>
 
       {/* Recommended Sort Explanation - Only show if using Recommended sort */}
-      {sortCriteria.some(c => c.field === 'recommended') && (
-        <div className="bg-black/40 border border-osrs-border/50 rounded-lg p-4 text-sm flex items-start gap-4">
-          <div className="bg-osrs-gold/10 p-2 rounded-full border border-osrs-gold/30 shrink-0">
-            <Calculator className="w-5 h-5 text-osrs-gold" />
-          </div>
-          <div className="space-y-1">
-            <h4 className="text-osrs-gold font-bold">How is "Recommended" Calculated?</h4>
-            <p className="text-gray-400">
-              The AI Score evaluates every item based on a weighted formula to find the safest and most profitable flips:
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-2 mt-2 text-xs text-gray-300">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                <span className="font-bold text-white">ROI Priority:</span> Favors higher margins.
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                <span className="font-bold text-white">Volume Check:</span> Ensures liquidity for quick trades.
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-purple-500"></span>
-                <span className="font-bold text-white">Stability:</span> Avoids highly volatile "crash" items.
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Filter & Sort Controls */}
       {data.parsedItems.length > 0 && (
@@ -641,6 +614,37 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
         </div>
       )}
 
+      {/* Help / Explanation Section */}
+      <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg p-4 mb-6 text-sm text-gray-300">
+        <h4 className="text-blue-400 font-bold mb-2 flex items-center gap-2">
+          <Info className="w-4 h-4" /> How calculations work
+        </h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <p className="font-bold text-white mb-1">Risk Appetite:</p>
+            <ul className="list-disc list-inside text-xs space-y-1 text-gray-400">
+              <li><span className="text-green-400 font-bold">Low Risk:</span> High Liquidity Only (GE Limit &ge; 500 OR Daily Vol &ge; 2,000) AND ROI &le; 5%.</li>
+              <li><span className="text-yellow-400 font-bold">Medium Risk:</span> Moderate Liquidity (Limit &ge; 50 OR Daily Vol &ge; 500).</li>
+              <li><span className="text-red-400 font-bold">High Risk:</span> No restrictions. Includes low-volume & high-volatility items.</li>
+            </ul>
+          </div>
+          <div>
+            <p className="font-bold text-white mb-1">Recommended Sort (Hourly Profit):</p>
+            <p className="text-xs text-gray-400 mb-1">
+              Calculated as <span className="text-osrs-gold">Profit/Item &times; Valid Volume</span>.
+            </p>
+            <p className="text-xs text-gray-400">
+              "Valid Volume" is the <u>lowest</u> of:
+            </p>
+            <ul className="list-disc list-inside text-xs space-y-1 text-gray-400 ml-2">
+              <li>Your Budget Capacity (buying power).</li>
+              <li>GE Limit (per 4 hours).</li>
+              <li>Effective Market Rate (30% of actual trade volume).</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
       {/* No Items Fallback */}
       {displayedItems.length === 0 && data.parsedItems.length > 0 && (
         <div className="bg-osrs-panel border border-osrs-border rounded-lg p-8 text-center text-gray-500">
@@ -709,6 +713,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                     ROI: {item.roi?.toFixed(1) || '0.0'}%
                   </span>
                 </div>
+
 
                 {/* Content Layout */}
                 <div className={`flex-1 ${viewMode === 'list' ? 'flex flex-col md:flex-row gap-4' : 'flex flex-col gap-2'}`}>
@@ -1017,7 +1022,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                   </div>
                 ) : chartData.length > 0 ? (
                   <div className="flex flex-col gap-2" onWheel={(e) => handleWheel(e, chartData.length)}>
-                    <div className="h-64 w-full">
+                    <div className="h-64 w-full min-w-0">
                       <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart data={chartData} syncId="priceVolumeSync">
                           <defs>
@@ -1042,13 +1047,29 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                             orientation="right"
                           />
                           <Tooltip
-                            contentStyle={{ backgroundColor: '#111', borderColor: '#d4af37', color: '#fff', fontSize: '12px' }}
-                            labelFormatter={(unixTime) => new Date(unixTime * 1000).toLocaleString()}
-                            formatter={(value: number, name: string) => {
-                              if (value === undefined || value === null) return [null, null]; // Hide invalid entries
-                              if (name === 'avgHighPrice') return [value.toLocaleString() + ' GP', 'Offer Price (High)'];
-                              if (name === 'avgLowPrice') return [value.toLocaleString() + ' GP', 'Request Price (Low)'];
-                              return [value, name];
+                            content={({ active, payload, label }) => {
+                              if (active && payload && payload.length) {
+                                // Access the raw data object from the first payload item
+                                const data = payload[0].payload;
+                                return (
+                                  <div className="bg-[#111] border border-osrs-gold p-2 text-xs text-white shadow-xl">
+                                    <p className="font-bold mb-1 border-b border-gray-700 pb-1">{new Date(label * 1000).toLocaleString()}</p>
+
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <div className="w-2 h-2 rounded-full bg-[#f59e0b]"></div>
+                                      <span className="text-gray-300">Offer Price (High):</span>
+                                      <span className="font-mono">{data.avgHighPrice.toLocaleString()} GP</span>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2 h-2 rounded-full bg-[#3b82f6]"></div>
+                                      <span className="text-gray-300">Request Price (Low):</span>
+                                      <span className="font-mono">{data.avgLowPrice.toLocaleString()} GP</span>
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return null;
                             }}
                           />
                           <Line
@@ -1088,7 +1109,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                       </ResponsiveContainer>
                     </div>
 
-                    <div className="h-40 w-full">
+                    <div className="h-40 w-full min-w-0">
                       <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart data={chartData} syncId="priceVolumeSync">
                           <CartesianGrid strokeDasharray="3 3" stroke="#3e3529" vertical={false} opacity={0.5} />
@@ -1263,7 +1284,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
             {/* Content */}
             <div className="flex-1 p-6 flex flex-col gap-4 overflow-hidden bg-[#111]" onWheel={(e) => handleWheel(e, chartData.length)}>
               {/* Top: Price Chart */}
-              <div className="flex-1 w-full min-h-0 bg-[#1e1e1e] rounded border border-osrs-border/30 p-2 relative">
+              <div className="flex-1 w-full min-h-0 min-w-0 bg-[#1e1e1e] rounded border border-osrs-border/30 p-2 relative">
                 <div className="absolute top-4 left-4 z-10 bg-black/60 px-2 py-1 rounded text-osrs-gold text-xs font-bold border border-osrs-gold/30">Price History</div>
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={chartData} syncId="expandedSync">
@@ -1285,13 +1306,32 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                       tick={{ fill: '#9ca3af' }}
                     />
                     <Tooltip
-                      contentStyle={{ backgroundColor: '#000', borderColor: '#d4af37', color: '#fff', fontSize: '14px' }}
-                      labelFormatter={(unixTime) => new Date(unixTime * 1000).toLocaleString()}
-                      formatter={(value: number, name: string) => {
-                        if (value === undefined || value === null) return [null, null]; // Hide invalid entries
-                        if (name === 'avgHighPrice') return [value.toLocaleString() + ' GP', 'Offer Price (High)'];
-                        if (name === 'avgLowPrice') return [value.toLocaleString() + ' GP', 'Request Price (Low)'];
-                        return [value, name];
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-[#111] border border-osrs-gold p-3 text-sm text-white shadow-xl min-w-[200px]">
+                              <p className="font-bold mb-2 border-b border-gray-700 pb-1 text-osrs-gold">{new Date(label * 1000).toLocaleString()}</p>
+
+                              <div className="flex items-center justify-between gap-4 mb-1">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full bg-[#f59e0b]"></div>
+                                  <span className="text-gray-300">Offer (High):</span>
+                                </div>
+                                <span className="font-mono text-[#f59e0b]">{data.avgHighPrice.toLocaleString()} GP</span>
+                              </div>
+
+                              <div className="flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full bg-[#3b82f6]"></div>
+                                  <span className="text-gray-300">Request (Low):</span>
+                                </div>
+                                <span className="font-mono text-[#3b82f6]">{data.avgLowPrice.toLocaleString()} GP</span>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
                       }}
                     />
                     <Line
@@ -1325,7 +1365,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
               </div>
 
               {/* Bottom: Volume Chart */}
-              <div className="h-1/4 w-full min-h-[150px] bg-[#1e1e1e] rounded border border-osrs-border/30 p-2 relative">
+              <div className="h-1/4 w-full min-h-[150px] min-w-0 bg-[#1e1e1e] rounded border border-osrs-border/30 p-2 relative">
                 <div className="absolute top-4 left-4 z-10 bg-black/60 px-2 py-1 rounded text-blue-400 text-xs font-bold border border-blue-400/30">Volume History</div>
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={chartData} syncId="expandedSync">

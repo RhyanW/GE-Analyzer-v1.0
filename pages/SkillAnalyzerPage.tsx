@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PlayerStats } from '../types';
 import { getPlayerStats } from '../services/osrs';
+import { fetchLatestPrices } from '../services/market';
 import PlayerStatsDisplay from '../components/PlayerStatsDisplay';
 import { Search, Loader2, AlertTriangle, User } from 'lucide-react';
 
@@ -8,16 +9,20 @@ const SkillAnalyzerPage: React.FC = () => {
     const [username, setUsername] = useState('');
     const [loading, setLoading] = useState(false);
     const [stats, setStats] = useState<PlayerStats | null>(null);
+    const [prices, setPrices] = useState<any>(null);
     const [prevUsername, setPrevUsername] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    // Persist username
+    // Persist username and fetch prices
     useEffect(() => {
         const savedUser = localStorage.getItem('osrs_username');
         if (savedUser) {
             setUsername(savedUser);
             handleFetchStats(savedUser);
         }
+
+        // Fetch prices for the calculator
+        fetchLatestPrices().then(data => setPrices(data.data)).catch(err => console.error("Calc prices error:", err));
     }, []);
 
     const handleFetchStats = async (userToFetch: string) => {
@@ -104,7 +109,7 @@ const SkillAnalyzerPage: React.FC = () => {
 
             {stats && prevUsername && (
                 <div className="animate-slide-up">
-                    <PlayerStatsDisplay stats={stats} username={prevUsername} />
+                    <PlayerStatsDisplay stats={stats} username={prevUsername} prices={prices} />
                 </div>
             )}
         </div>

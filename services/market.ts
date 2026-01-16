@@ -30,7 +30,7 @@ const fetchItemMapping = async (): Promise<WikiItemMapping[]> => {
 /**
  * Fetches real-time buy/sell prices
  */
-const fetchLatestPrices = async (): Promise<WikiLatestResponse> => {
+export const fetchLatestPrices = async (): Promise<WikiLatestResponse> => {
   try {
     const response = await fetch(PROXY_URL + encodeURIComponent(LATEST_PRICES_URL));
     if (!response.ok) throw new Error("Failed to fetch latest prices");
@@ -107,7 +107,7 @@ export const analyzeMarket = async (settings: FlipSettings): Promise<MarketRespo
     // Filter: Price Age (Data Freshness)
     // Ignore prices older than 1 hour (3600 seconds) unless searching
     const now = Math.floor(Date.now() / 1000);
-    const MAX_AGE = 3600;
+    const MAX_AGE = 43200; // 12 hours (much more relaxed for general analyzer)
 
     // If not searching, strictly enforce data freshness
     if (!isSpecificItemSearch && priceData) {
@@ -168,14 +168,7 @@ export const analyzeMarket = async (settings: FlipSettings): Promise<MarketRespo
 
     // Filter: Minimum ROI (relaxed for specific item searches)
     // Ignore items with < 1% ROI (unless High Alch, where volume matters more)
-    if (!isSpecificItemSearch && settings.strategy === StrategyType.FLIPPING && roi < 1) continue;
-
-    // Filter: Risk/Volume Heuristic (Approximation using Buy Limit)
-    // Low Limit = High Risk (Illiquid). High Limit = Low Risk (Liquid)
-    // Relaxed limits to find more items
-    if (settings.risk === RiskLevel.LOW && item.limit < 500) continue;
-    if (settings.risk === RiskLevel.MEDIUM && item.limit < 50) continue;
-    // High risk accepts anything
+    if (!isSpecificItemSearch && settings.strategy === StrategyType.FLIPPING && roi < 0.5) continue;
 
     // Get Volume
     const volData = volumes[item.id];
@@ -183,12 +176,37 @@ export const analyzeMarket = async (settings: FlipSettings): Promise<MarketRespo
     const volumeLow = volData ? volData.lowPriceVolume : 0;
     const volume24h = volumeHigh + volumeLow;
 
+    // Filter: Risk Appetite Logic
+    // Using composite factors: GE Limit, 24h Volume, and ROI Volatility
+    if (!isSpecificItemSearch && settings.strategy === StrategyType.FLIPPING) {
+      if (settings.risk === RiskLevel.LOW) {
+        // Low Risk: High Liquidity, Stable Margins
+        // 1. Must be liquid: Limit >= 500 OR Volume >= 2000
+        const isLiquid = item.limit >= 500 || volume24h >= 2000;
+        // 2. Must not be too volatile: ROI <= 5% (Prevent accidentally buying into massive crashes/spikes)
+        const isStable = roi <= 5;
+
+        if (!isLiquid || !isStable) continue;
+      }
+      else if (settings.risk === RiskLevel.MEDIUM) {
+        // Medium Risk: Moderate Liquidity
+        // Limit >= 50 OR Volume >= 500
+        const isModeratelyLiquid = item.limit >= 50 || volume24h >= 500;
+
+        if (!isModeratelyLiquid) continue;
+      }
+      // High Risk: Accepts anything (Illiquid, High Volatility)
+    }
+
     // Calculate Hourly Profit
     const buyRate = volumeLow / 24;
     const sellRate = volumeHigh / 24;
 
     // We are limited by the slower of the two rates (buying or selling)
-    const effectiveRate = Math.min(buyRate, sellRate);
+    // Competition Factor: We assume we can realistically capture ~30% of the market volume
+    // This accounts for other flippers and players outbidding us
+    const competitionFactor = 0.3;
+    const effectiveRate = Math.min(buyRate, sellRate) * competitionFactor;
 
     // We are also limited by the GE limit (per 4 hours, so limit/4 per hour)
     const geLimitHourly = item.limit > 0 ? item.limit / 4 : effectiveRate;
