@@ -796,7 +796,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                       </div>
                       {hasImpliedCost && (
                         <div className="flex justify-between border-b border-gray-700 pb-1">
-                          <span className="text-gray-500">- {isAlch ? 'Nat Rune' : 'GE Tax (1%)'}</span>
+                          <span className="text-gray-500">- {isAlch ? 'Nat Rune' : 'GE Tax (2%)'}</span>
                           <span className="text-red-400">-{impliedCost.toLocaleString()}</span>
                         </div>
                       )}

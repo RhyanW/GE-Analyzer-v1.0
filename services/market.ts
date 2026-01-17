@@ -152,8 +152,11 @@ export const analyzeMarket = async (settings: FlipSettings): Promise<MarketRespo
       buyPrice = currentBuyPrice;
       sellPrice = currentSellPrice;
 
-      // GE Tax: 1% capped at 5M
-      const tax = Math.min(sellPrice * 0.01, 5000000);
+      // GE Tax: 2% capped at 5M, exempt if < 50 GP
+      let tax = 0;
+      if (sellPrice >= 50) {
+        tax = Math.min(Math.floor(sellPrice * 0.02), 5000000);
+      }
 
       profit = (sellPrice - buyPrice) - tax;
       roi = (profit / buyPrice) * 100;

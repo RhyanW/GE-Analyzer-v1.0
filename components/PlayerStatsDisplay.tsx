@@ -52,7 +52,16 @@ const PlayerStatsDisplay: React.FC<PlayerStatsDisplayProps> = ({ stats, username
     }, [stats]);
 
     const activeStats = isSimMode ? simStats : stats;
-    const totalLevel = activeStats.overall.level; // Note: This won't update strictly unless we recalc total, but combat level is what matters
+
+    const calculateTotalLevel = (s: PlayerStats) => {
+        return SKILL_NAMES.reduce((acc, skill) => {
+            const level = s[skill]?.level || 0;
+            return acc + level;
+        }, 0);
+    };
+
+    const totalLevel = calculateTotalLevel(activeStats);
+    const originalTotalLevel = calculateTotalLevel(stats);
     const combatLevel = getCombatLevel(activeStats);
     const originalCombatLevel = getCombatLevel(stats);
 
@@ -190,15 +199,26 @@ const PlayerStatsDisplay: React.FC<PlayerStatsDisplayProps> = ({ stats, username
                         </button>
                     </div>
 
-                    <div className="text-base md:text-xl font-bold text-white">
-                        <span className="text-osrs-orange hidden xs:inline">Combat Level: </span>
-                        <span className="text-osrs-orange inline xs:hidden">Cmb: </span>
-                        <span className={`${isSimMode && combatLevel !== originalCombatLevel ? 'text-green-400' : 'text-white'}`}>
-                            {combatLevel}
-                        </span>
-                        {isSimMode && combatLevel !== originalCombatLevel && (
-                            <span className="text-xs text-gray-400 ml-1 md:ml-2">({originalCombatLevel})</span>
-                        )}
+                    <div className="flex items-center gap-4 text-sm md:text-base font-bold">
+                        <div className="flex items-center gap-2">
+                            <span className="text-osrs-orange">Cmb:</span>
+                            <span className={`${isSimMode && combatLevel !== originalCombatLevel ? 'text-green-400' : 'text-white'}`}>
+                                {combatLevel}
+                                {isSimMode && combatLevel !== originalCombatLevel && (
+                                    <span className="text-[10px] text-gray-400 ml-1">({originalCombatLevel})</span>
+                                )}
+                            </span>
+                        </div>
+
+                        <div className="flex items-center gap-2 border-l border-white/10 pl-4">
+                            <span className="text-osrs-gold">Total:</span>
+                            <span className={`${isSimMode && totalLevel !== originalTotalLevel ? 'text-green-400' : 'text-white'}`}>
+                                {totalLevel.toLocaleString()}
+                                {isSimMode && totalLevel !== originalTotalLevel && (
+                                    <span className="text-[10px] text-gray-400 ml-1">({originalTotalLevel})</span>
+                                )}
+                            </span>
+                        </div>
                     </div>
                 </div>
 
