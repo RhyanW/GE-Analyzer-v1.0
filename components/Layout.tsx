@@ -1,7 +1,11 @@
 import React, { ReactNode } from 'react';
 import { NavLink, Link } from 'react-router-dom';
-import { Coins, Anchor, BookOpen, Home } from 'lucide-react';
+import { Coins, Anchor, BookOpen, Home, Bell, Trash2, X } from 'lucide-react';
 import ImmersiveOrientationNotice from './ImmersiveOrientationNotice';
+import PriceAlertMonitor from './PriceAlertMonitor';
+import AlertSidebar from './AlertSidebar';
+import { getAlerts, removeAlert, clearNotified, requestNotificationPermission } from '../services/alerts';
+import { PriceAlert } from '../types';
 
 interface LayoutProps {
   children: ReactNode;
@@ -64,10 +68,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     : 'text-gray-400 hover:text-white hover:bg-white/10'}`
                 }
               >
-                {/* Reusing RefreshCcw or similar icon for Alch */}
                 <span className="text-lg leading-none">✨</span> <span className="hidden sm:inline">Alchemy</span>
               </NavLink>
-
 
               <NavLink
                 to="/skills"
@@ -96,6 +98,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           Prices sourced directly from the OSRS Wiki Real-time API. Margins include estimated GE Tax.
         </p>
       </footer>
+      {/* Layout Elements */}
+      <PriceAlertMonitor />
+      <AlertSidebar />
+
     </div>
   );
 };

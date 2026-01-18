@@ -15,6 +15,20 @@ export enum StrategyType {
   PLAYER_LOOKUP = 'Player Lookup'
 }
 
+export enum AlertType {
+  PRICE = 'Price Level',
+  STOP_LOSS = 'Stop Loss',
+  VOLUME = 'Volume Spike',
+  PROFIT = 'Profit Target'
+}
+
+export enum AlertCategory {
+  FLIPPING = 'Flipping',
+  INVESTMENT = 'Investment',
+  PANIC_SELL = 'Panic Sell',
+  MISC = 'Misc'
+}
+
 export interface FlipSettings {
   budget: number;
   membership: MembershipStatus;
@@ -125,5 +139,36 @@ export interface Wiki24hData {
 
 export interface Wiki24hResponse {
   data: Record<string, Wiki24hData>;
+  timestamp: number;
+}
+
+export interface PriceAlert {
+  id: number;
+  name: string;
+  targetPrice: number;
+  initialPrice: number;
+  priceType: 'buy' | 'sell';
+  condition: 'above' | 'below';
+  alertType: AlertType;
+  category: AlertCategory;
+  isNotified: boolean;
+  createdAt: number;
+  sparklineData?: number[]; // Recent price points
+  linkedAlertId?: number; // For Profit Target pairs
+
+  // Flip Tracking
+  isTrackingFlip?: boolean;
+  purchasePrice?: number;
+  quantity?: number;
+}
+
+export interface CompletedFlip {
+  id: number;
+  name: string;
+  purchasePrice: number;
+  sellPrice: number;
+  quantity: number;
+  profit: number;
+  roi: number;
   timestamp: number;
 }

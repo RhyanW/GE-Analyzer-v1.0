@@ -2,24 +2,43 @@ import { useState, useEffect } from 'react';
 
 export type Orientation = 'portrait' | 'landscape';
 
-export function useOrientation() {
-    const [orientation, setOrientation] = useState<Orientation>(
-        typeof window !== 'undefined' && window.innerHeight < window.innerWidth
-            ? 'landscape'
-            : 'portrait'
-    );
+export interface OrientationState {
+    orientation: Orientation;
+    isMobile: boolean;
+}
+
+export function useOrientation(): OrientationState {
+    const checkIsMobile = () => {
+        if (typeof navigator === 'undefined') return false;
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    };
+
+    const getOrientation = () => (window.innerHeight < window.innerWidth ? 'landscape' : 'portrait');
+
+    const [state, setState] = useState<OrientationState>({
+        orientation: typeof window !== 'undefined' ? getOrientation() : 'portrait',
+        isMobile: checkIsMobile()
+    });
 
     useEffect(() => {
         const handleResize = () => {
-            setOrientation(window.innerHeight < window.innerWidth ? 'landscape' : 'portrait');
+            setState({
+                orientation: getOrientation(),
+                isMobile: checkIsMobile()
+            });
         };
 
         window.addEventListener('resize', handleResize);
+        window.addEventListener('orientationchange', handleResize);
+
         // Initial check
         handleResize();
 
-        return () => window.removeEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            window.removeEventListener('orientationchange', handleResize);
+        };
     }, []);
 
-    return orientation;
+    return state;
 }

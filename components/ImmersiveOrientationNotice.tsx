@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useOrientation } from '../hooks/useOrientation';
 
 const ImmersiveOrientationNotice: React.FC = () => {
-    const orientation = useOrientation();
+    const { orientation, isMobile } = useOrientation();
     const [mounted, setMounted] = useState(false);
     const [isBlocked, setIsBlocked] = useState(false);
 
@@ -17,7 +17,7 @@ const ImmersiveOrientationNotice: React.FC = () => {
             const hasHiddenOverflow = document.body.style.overflow === 'hidden';
             const hasOverlay = !!document.querySelector('.fixed.bg-black') || !!document.querySelector('.backdrop-blur-md');
 
-            const showing = (hasHiddenOverflow || hasOverlay) && orientation === 'portrait';
+            const showing = isMobile && (hasHiddenOverflow || hasOverlay) && orientation === 'portrait';
             setIsBlocked(showing);
 
             // Force hide body if we are blocking, to prevent weird scrolling of the banner

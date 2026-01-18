@@ -3,9 +3,9 @@ import { useOrientation } from '../hooks/useOrientation';
 import { Smartphone } from 'lucide-react';
 
 const OrientationNotice: React.FC = () => {
-    const orientation = useOrientation();
+    const { orientation, isMobile } = useOrientation();
 
-    if (orientation === 'landscape') return null;
+    if (!isMobile || orientation === 'landscape') return null;
 
     return (
         <div className="md:hidden flex items-center justify-center gap-3 p-3 bg-osrs-gold/10 border border-osrs-gold/30 rounded-lg animate-pulse mb-4">

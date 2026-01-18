@@ -1,14 +1,64 @@
 :root {
-  --bg-primary: #121212;
-  --bg-panel: #2d2d2d;
-  --border: #3e3529;
-  --accent: #d4af37;
-  --text-primary: #e0e0e0;
-  --text-secondary: #9ca3af;
+  --bg-primary: #1b1612;
+  /* Ebony Brown */
+  --bg-panel: #28221d;
+  /* Mocha Brown */
+  --bg-card: #312a25;
+  /* Cacao Brown */
+  --osrs-gold: #b79d7e;
+  /* Kharid Sand */
+  --osrs-yellow: #f9d000;
+  /* Status Yellow */
+  --osrs-orange: #f7861b;
+  /* Status Orange */
+  --osrs-border: #3e362f;
+  /* Sable Brown */
+  --osrs-red: #ee4231;
+  /* Status Red */
+  --osrs-green: #6bc71f;
+  /* Status Green */
+  --text-primary: #e2dbc8;
+  /* Body Main */
 }
 
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  transition: background-color 0.3s ease, color 0.3s ease;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+@layer utilities {
+  .bg-parchment {
+    background-color: var(--bg-card);
+    background-image: url('https://www.transparenttextures.com/patterns/parchment.png');
+    border: 1px solid var(--osrs-border);
+  }
+
+  .font-fantasy {
+    font-family: 'MedievalSharp', cursive, serif;
+  }
+
+  /* Custom OSRS Scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: #1b1612;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #3e362f;
+    border: 1px solid #b79d7e66;
+    border-radius: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #b79d7e;
+  }
+
+  .animate-pulse-slow {
+    animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
 }

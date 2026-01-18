@@ -1,10 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { MarketResponseData, StrategyType, PlayerStats, ParsedItem, PriceHistoryPoint } from '../types';
+import { MarketResponseData, StrategyType, PlayerStats, ParsedItem, PriceHistoryPoint, AlertType, AlertCategory, MembershipStatus, RiskLevel, WikiPriceData, PriceAlert } from '../types';
 import { getNextLevelXp, getItemPriceHistory } from '../services/osrs';
+import { fetchLatestPrices } from '../services/market';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, AreaChart, Area, Brush, ComposedChart, Line, ReferenceLine } from 'recharts';
-import { TrendingUp, TrendingDown, Minus, AlertTriangle, Coins, Box, Filter, XCircle, Sparkles, RefreshCw, Clock, Loader2, ArrowRight, Info, LayoutGrid, List, AlertOctagon, X, Globe, LineChart, Calculator, ArrowUpDown, Plus, ArrowUp, ArrowDown, GripVertical, Maximize2, CircleDot } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, AlertTriangle, Coins, Box, Filter, XCircle, Sparkles, RefreshCw, Clock, Loader2, ArrowRight, Info, LayoutGrid, List, AlertOctagon, X, Globe, LineChart, Calculator, ArrowUpDown, Plus, ArrowUp, ArrowDown, GripVertical, Maximize2, CircleDot, Bell, BellOff, ExternalLink, RefreshCcw, ShieldCheck, Zap } from 'lucide-react';
 import OrientationNotice from './OrientationNotice';
+import { addAlert, getAlerts } from '../services/alerts';
 
 interface ResultsDisplayProps {
   data: MarketResponseData;
@@ -134,6 +136,32 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   const [timeRange, setTimeRange] = useState<'All' | 'Year' | 'Quarter' | 'Month' | 'Week' | 'Day' | '12h' | '6h' | '2h' | '1h' | '30m'>('2h');
   const [isExpanded, setIsExpanded] = useState(false);
   const [showMarkers, setShowMarkers] = useState(true);
+  const [alertingItem, setAlertingItem] = useState<ParsedItem | null>(null);
+  const [targetAlertPrice, setTargetAlertPrice] = useState<number>(0);
+  const [alertCondition, setAlertCondition] = useState<'above' | 'below'>('above');
+  const [alertPriceType, setAlertPriceType] = useState<'buy' | 'sell'>('sell');
+  const [alertType, setAlertType] = useState<AlertType>(AlertType.PRICE);
+  const [alertCategory, setAlertCategory] = useState<AlertCategory>(AlertCategory.FLIPPING);
+
+  // Flip Tracking State
+  const [isLogBuy, setIsLogBuy] = useState(false);
+  const [purchasePrice, setPurchasePrice] = useState(0);
+  const [quantity, setQuantity] = useState(1);
+
+  // For highlighting
+  const [activeAlertIds, setActiveAlertIds] = useState<number[]>([]);
+  const [activeAlerts, setActiveAlerts] = useState<PriceAlert[]>([]);
+
+  useEffect(() => {
+    const refreshActiveAlerts = () => {
+      const alerts = getAlerts();
+      setActiveAlerts(alerts.filter(a => !a.isNotified));
+      setActiveAlertIds(alerts.filter(a => !a.isNotified).map(a => a.id));
+    };
+    refreshActiveAlerts();
+    window.addEventListener('priceAlertsUpdated', refreshActiveAlerts);
+    return () => window.removeEventListener('priceAlertsUpdated', refreshActiveAlerts);
+  }, []);
 
 
   // Fetch chart data when item or timeRange selection changes
@@ -414,6 +442,31 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
 
     if (newStartIndex !== zoomState.startIndex || newEndIndex !== zoomState.endIndex) {
       setZoomState({ startIndex: newStartIndex, endIndex: newEndIndex });
+    }
+  };
+
+  const handleQuickPreset = (preset: 'break-even' | 'roi-3' | 'stop-loss') => {
+    if (!alertingItem) return;
+
+    const currentFlip = activeAlerts.find(a => a.id === alertingItem.id && a.isTrackingFlip);
+    const effectivePurchasePrice = currentFlip?.purchasePrice || alertingItem.buy;
+
+    switch (preset) {
+      case 'break-even':
+        setTargetAlertPrice(effectivePurchasePrice);
+        setAlertCondition('above');
+        setAlertPriceType('sell');
+        break;
+      case 'roi-3':
+        setTargetAlertPrice(Math.round(effectivePurchasePrice * 1.03));
+        setAlertCondition('above');
+        setAlertPriceType('sell');
+        break;
+      case 'stop-loss':
+        setTargetAlertPrice(Math.round(effectivePurchasePrice * 0.95)); // 5% stop loss
+        setAlertCondition('below');
+        setAlertPriceType('sell');
+        break;
     }
   };
 
@@ -718,13 +771,13 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                 )}
 
                 {/* Header Row */}
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex items-start gap-3 min-w-0">
+                <div className="flex justify-between items-start mb-3 gap-2">
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
                     <div className="mt-1 flex-shrink-0">
                       <ItemIcon name={item.name} id={item.id} />
                     </div>
-                    <div className="min-w-0">
-                      <h3 className="text-lg font-fantasy text-osrs-yellow leading-tight break-words" title={item.name}>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-fantasy text-osrs-yellow leading-tight truncate md:whitespace-normal group-hover:text-osrs-gold transition-colors" title={item.name}>
                         {item.name}
                       </h3>
                       {/* Trend Indicator Mobile/Grid */}
@@ -736,9 +789,39 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                       )}
                     </div>
                   </div>
-                  <span className={`text-xs font-mono font-bold px-2 py-1 rounded border whitespace-nowrap ml-2 flex-shrink-0 ${isAlch ? 'text-purple-300 bg-purple-900/30 border-purple-800' : 'text-green-500 bg-green-900/30 border-green-900/50'}`}>
-                    ROI: {item.roi?.toFixed(1) || '0.0'}%
-                  </span>
+                  <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                    <div className="flex items-center gap-1.5 self-end">
+                      {activeAlerts.find(a => a.id === item.id && a.isTrackingFlip) && (
+                        <div className="flex items-center gap-1 bg-black/40 border border-osrs-yellow/30 px-1.5 py-0.5 rounded shadow-sm" title="Active Flip Tracking">
+                          <Coins size={10} className="text-osrs-gold animate-bounce" />
+                          <span className="text-[8px] text-osrs-yellow font-bold tracking-tighter">ACTIVE</span>
+                        </div>
+                      )}
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAlertingItem(item);
+                          setTargetAlertPrice(item.sell);
+                          setAlertCondition('above');
+                          setAlertPriceType('sell');
+                          setAlertType(AlertType.PRICE);
+                          setAlertCategory(AlertCategory.FLIPPING);
+                          setIsLogBuy(false);
+                          setPurchasePrice(item.buy);
+                          setQuantity(item.limit || 1);
+                        }}
+                        className={`p-1 px-1.5 rounded border transition-all flex items-center gap-1 text-[9px] font-bold ${activeAlertIds.includes(item.id) ? 'bg-osrs-gold text-black border-osrs-gold shadow-lg shadow-osrs-gold/10' : 'border-osrs-gold/40 text-osrs-gold hover:bg-osrs-gold hover:text-black'}`}
+                      >
+                        <Bell size={10} className={activeAlertIds.includes(item.id) ? 'fill-current' : ''} />
+                        Alert
+                      </button>
+                    </div>
+
+                    <span className={`text-[10px] font-mono font-bold px-1.5 py-1 rounded border whitespace-nowrap shadow-sm ${isAlch ? 'text-purple-300 bg-purple-900/30 border-purple-800/50' : 'text-green-500 bg-green-900/30 border-green-900/40'}`}>
+                      ROI: {item.roi?.toFixed(1) || '0.0'}%
+                    </span>
+                  </div>
                 </div>
 
 
@@ -884,11 +967,11 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
       {selectedItem && createPortal(
         <div className="fixed inset-0 z-[2000] flex items-center justify-center p-0 md:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
           <div
-            className="bg-[#1e1e1e] border-y-2 lg:border-2 border-osrs-gold rounded-none lg:rounded-lg shadow-2xl w-screen h-screen lg:w-auto lg:h-auto lg:max-w-[70vw] lg:max-h-[90vh] flex flex-col relative overflow-hidden"
+            className="bg-osrs-bg border-y-2 lg:border-2 border-osrs-gold rounded-none lg:rounded-lg shadow-2xl w-screen h-screen lg:w-auto lg:h-auto lg:max-w-[70vw] lg:max-h-[90vh] flex flex-col relative overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="p-4 border-b border-osrs-border bg-[#2c241b] flex items-center justify-between">
+            <div className="p-4 border-b border-osrs-border bg-osrs-panel flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <ItemIcon name={selectedItem.name} id={selectedItem.id} size="lg" />
                 <div>
@@ -1082,7 +1165,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                                 // Access the raw data object from the first payload item
                                 const data = payload[0].payload;
                                 return (
-                                  <div className="bg-[#111] border border-osrs-gold p-2 text-xs text-white shadow-xl">
+                                  <div className="bg-osrs-bg border border-osrs-gold p-2 text-xs text-white shadow-xl">
                                     <p className="font-bold mb-1 border-b border-gray-700 pb-1">{new Date(label * 1000).toLocaleString()}</p>
 
                                     <div className="flex items-center gap-2 mb-1">
@@ -1138,7 +1221,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                       </ResponsiveContainer>
                     </div>
 
-                    <div className="h-40 w-full min-w-0 min-h-0 bg-[#1e1e1e]">
+                    <div className="h-40 w-full min-w-0 min-h-0 bg-osrs-bg">
                       <ResponsiveContainer width="100%" height="100%" debounce={100}>
                         <ComposedChart data={chartData} syncId="priceVolumeSync" margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#3e3529" vertical={false} opacity={0.5} />
@@ -1262,12 +1345,12 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
         <div className="fixed inset-0 flex items-center justify-center p-2 md:p-4 bg-black/95 backdrop-blur-md animate-in fade-in zoom-in duration-200" style={{ zIndex: 2100 }}>
           <div className="bg-[#1e1e1e] border border-osrs-gold rounded-lg shadow-2xl w-full h-full max-w-[98vw] max-h-[95vh] flex flex-col overflow-hidden">
             {/* Header - Two Tiered on Mobile */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between p-3 md:p-4 border-b border-osrs-border bg-[#2c241b] shrink-0 gap-3">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between p-3 md:p-4 border-b border-osrs-border bg-osrs-border/30 shrink-0 gap-3">
               {/* Row 1/Left: Item Identity */}
               <div className="flex items-center justify-between lg:justify-start gap-2 md:gap-3 min-w-0">
                 <div className="flex items-center gap-2 md:gap-3 min-w-0">
                   <ItemIcon name={selectedItem.name} id={selectedItem.id} size="sm" />
-                  <h3 className="text-osrs-gold font-fantasy text-sm md:text-xl tracking-wide truncate">
+                  <h3 className="text-osrs-gold font-bold text-sm md:text-xl tracking-wide truncate">
                     {selectedItem.name}
                     <span className="text-gray-400 text-xs md:text-lg font-sans hidden md:inline ml-2 opacity-50">
                       | Price & Volume Analysis
@@ -1317,16 +1400,16 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
             </div>
 
             {/* Content */}
-            <div className="flex-1 p-3 md:p-6 flex flex-col gap-4 overflow-hidden bg-[#111]" onWheel={(e) => handleWheel(e, chartData.length)}>
+            <div className="flex-1 p-3 md:p-6 flex flex-col gap-4 overflow-hidden bg-osrs-bg" onWheel={(e) => handleWheel(e, chartData.length)}>
               {loadingChart ? (
-                <div className="flex-1 flex flex-col items-center justify-center gap-4 text-osrs-gold bg-[#1e1e1e] rounded border border-osrs-border/30">
+                <div className="flex-1 flex flex-col items-center justify-center gap-4 text-osrs-gold bg-osrs-panel rounded border border-osrs-border/30">
                   <Loader2 className="w-12 h-12 animate-spin opacity-50" />
                   <p className="font-fantasy text-xl animate-pulse">Consulting the Grand Exchange Archives...</p>
                 </div>
               ) : chartData.length > 0 ? (
                 <>
                   {/* Top: Price Chart */}
-                  <div className="flex-[3] w-full min-h-[250px] min-w-0 min-h-0 bg-[#1e1e1e] rounded border border-osrs-border/30 p-2 relative">
+                  <div className="flex-[3] w-full min-h-[250px] min-w-0 min-h-0 bg-osrs-panel rounded border border-osrs-border/30 p-2 relative">
                     <div className="absolute top-2 left-2 z-10 bg-black/60 px-2 py-0.5 rounded text-osrs-gold text-[10px] font-bold border border-osrs-gold/30">Price History</div>
                     <div className="w-full h-full min-w-0 min-h-0">
                       <ResponsiveContainer width="100%" height="100%" debounce={100}>
@@ -1354,7 +1437,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                               if (active && payload && payload.length) {
                                 const d = payload[0].payload;
                                 return (
-                                  <div className="bg-[#111] border border-osrs-gold p-2 text-[10px] md:text-sm text-white shadow-xl min-w-[150px]">
+                                  <div className="bg-osrs-bg border border-osrs-gold p-2 text-[10px] md:text-sm text-white shadow-xl min-w-[150px]">
                                     <p className="font-bold mb-1 border-b border-gray-700 pb-1 text-osrs-gold">{new Date(label * 1000).toLocaleString()}</p>
                                     <div className="flex justify-between gap-4">
                                       <span className="text-gray-300">Offer:</span>
@@ -1399,7 +1482,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                   </div>
 
                   {/* Bottom: Volume Chart */}
-                  <div className="flex-1 w-full min-h-[150px] min-w-0 min-h-0 bg-[#1e1e1e] rounded border border-osrs-border/30 p-2 relative">
+                  <div className="flex-1 w-full min-h-[150px] min-w-0 min-h-0 bg-osrs-panel rounded border border-osrs-border/30 p-2 relative">
                     <div className="absolute top-2 left-2 z-10 bg-black/60 px-2 py-0.5 rounded text-blue-400 text-[10px] font-bold border border-blue-400/30">Volume History</div>
                     <div className="w-full h-full min-w-0 min-h-0">
                       <ResponsiveContainer width="100%" height="100%" debounce={100}>
@@ -1426,7 +1509,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                   </div>
                 </>
               ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-gray-500 italic bg-[#1e1e1e] rounded border border-osrs-border/30">
+                <div className="flex-1 flex flex-col items-center justify-center text-gray-500 italic bg-osrs-panel rounded border border-osrs-border/30">
                   No historical data available for this timeframe.
                 </div>
               )}
@@ -1441,6 +1524,227 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
           {data.text}
         </p>
       </div>
+
+      {/* Price Alert Modal */}
+      {alertingItem && (
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-osrs-panel border-2 border-osrs-gold rounded-lg w-full max-w-sm shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-osrs-border p-4 flex justify-between items-center border-b border-osrs-gold/30">
+              <h3 className="text-osrs-gold font-bold text-xl flex items-center gap-2">
+                <Bell size={20} /> Set Price Alert
+              </h3>
+              <button onClick={() => setAlertingItem(null)} className="text-gray-400 hover:text-white">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-3">
+                <ItemIcon name={alertingItem.name} id={alertingItem.id} />
+                <div className="flex-1">
+                  <h2 className="text-lg font-bold text-osrs-gold leading-tight">{alertingItem.name}</h2>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">ID: {alertingItem.id}</p>
+                    {alertingItem.volume < 1000 && (
+                      <div className="flex items-center gap-1 text-osrs-orange animate-pulse">
+                        <AlertTriangle size={10} />
+                        <span className="text-[9px] font-bold uppercase">Low Volume Warning</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs text-gray-400 uppercase font-bold tracking-wider">Alert when price is</label>
+                <div className="flex bg-black/40 p-1 rounded border border-white/10">
+                  <button
+                    onClick={() => setAlertCondition('above')}
+                    className={`flex-1 py-1.5 rounded text-xs font-bold transition-all ${alertCondition === 'above' ? 'bg-osrs-gold text-black' : 'text-gray-400 hover:text-white'}`}
+                  >
+                    Above or Equal
+                  </button>
+                  <button
+                    onClick={() => setAlertCondition('below')}
+                    className={`flex-1 py-1.5 rounded text-xs font-bold transition-all ${alertCondition === 'below' ? 'bg-osrs-gold text-black' : 'text-gray-400 hover:text-white'}`}
+                  >
+                    Below or Equal
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs text-gray-400 uppercase font-bold tracking-wider">On Price Type</label>
+                <div className="flex bg-black/40 p-1 rounded border border-white/10">
+                  <button
+                    onClick={() => {
+                      setAlertPriceType('buy');
+                      setTargetAlertPrice(alertingItem.buy);
+                    }}
+                    className={`flex-1 py-1.5 rounded text-xs font-bold transition-all ${alertPriceType === 'buy' ? 'bg-osrs-gold text-black' : 'text-gray-400 hover:text-white'}`}
+                  >
+                    Buy (Offer)
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAlertPriceType('sell');
+                      setTargetAlertPrice(alertingItem.sell);
+                    }}
+                    className={`flex-1 py-1.5 rounded text-xs font-bold transition-all ${alertPriceType === 'sell' ? 'bg-osrs-gold text-black' : 'text-gray-400 hover:text-white'}`}
+                  >
+                    Sell (Request)
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs text-gray-400 uppercase font-bold tracking-wider">Quick-Set Presets</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => handleQuickPreset('break-even')}
+                    className="bg-osrs-panel border border-osrs-border/50 text-[10px] py-1.5 rounded hover:bg-osrs-gold hover:text-black hover:border-osrs-gold transition-all font-bold font-mono"
+                  >
+                    BREAK-EVEN
+                  </button>
+                  <button
+                    onClick={() => handleQuickPreset('roi-3')}
+                    className="bg-osrs-panel border border-osrs-border/50 text-[10px] py-1.5 rounded hover:bg-osrs-gold hover:text-black hover:border-osrs-gold transition-all font-bold font-mono"
+                  >
+                    3% ROI
+                  </button>
+                  <button
+                    onClick={() => handleQuickPreset('stop-loss')}
+                    className="bg-osrs-panel border border-osrs-border/50 text-[10px] py-1.5 rounded hover:bg-red-500 hover:text-white hover:border-red-500 transition-all font-bold font-mono"
+                  >
+                    STOP LOSS
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs text-gray-400 uppercase font-bold tracking-wider">Alert Type / Category</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    value={alertType}
+                    onChange={(e) => setAlertType(e.target.value as AlertType)}
+                    className="bg-black/50 border border-osrs-border rounded px-2 py-1.5 text-[11px] text-white outline-none focus:border-osrs-gold"
+                  >
+                    {Object.values(AlertType).map(v => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                  <select
+                    value={alertCategory}
+                    onChange={(e) => setAlertCategory(e.target.value as AlertCategory)}
+                    className="bg-black/50 border border-osrs-border rounded px-2 py-1.5 text-[11px] text-white outline-none focus:border-osrs-gold"
+                  >
+                    {Object.values(AlertCategory).map(v => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-2 border-t border-osrs-border/30">
+                <div
+                  onClick={() => setIsLogBuy(!isLogBuy)}
+                  className="flex justify-between items-center cursor-pointer group"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${isLogBuy ? 'bg-osrs-gold border-osrs-gold' : 'border-osrs-border group-hover:border-osrs-gold/50'}`}>
+                      {isLogBuy && <ShieldCheck size={12} className="text-black" />}
+                    </div>
+                    <span className="text-xs font-bold text-gray-300">Log this as a Buy (Active Flip)</span>
+                  </div>
+                </div>
+
+                {isLogBuy && (
+                  <div className="grid grid-cols-2 gap-3 animate-in slide-in-from-top-2 duration-200">
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-gray-500 uppercase font-bold">Purchase Price</label>
+                      <input
+                        type="number"
+                        value={purchasePrice}
+                        onChange={(e) => setPurchasePrice(Number(e.target.value))}
+                        className="w-full bg-black/50 border border-osrs-border rounded px-2 py-1.5 text-xs text-white outline-none focus:border-osrs-gold"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-gray-500 uppercase font-bold">Quantity</label>
+                      <input
+                        type="number"
+                        value={quantity}
+                        onChange={(e) => setQuantity(Number(e.target.value))}
+                        className="w-full bg-black/50 border border-osrs-border rounded px-2 py-1.5 text-xs text-white outline-none focus:border-osrs-gold"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs text-gray-400 uppercase font-bold tracking-wider">Target Price (GP)</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={targetAlertPrice}
+                    onChange={(e) => setTargetAlertPrice(Number(e.target.value))}
+                    className="w-full bg-black/50 border border-osrs-border rounded px-4 py-2 text-white font-mono focus:border-osrs-gold outline-none"
+                    placeholder="Enter price..."
+                  />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-osrs-orange font-bold pointer-events-none">
+                    GP
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setTargetAlertPrice(prev => prev + 1000)}
+                    className="bg-black/40 border border-white/5 text-[10px] px-2 py-1 rounded hover:bg-white/10 transition-colors"
+                  >+1k</button>
+                  <button
+                    onClick={() => setTargetAlertPrice(prev => prev + 10000)}
+                    className="bg-black/40 border border-white/5 text-[10px] px-2 py-1 rounded hover:bg-white/10 transition-colors"
+                  >+10k</button>
+                  <button
+                    onClick={() => setTargetAlertPrice(prev => prev + 100000)}
+                    className="bg-black/40 border border-white/5 text-[10px] px-2 py-1 rounded hover:bg-white/10 transition-colors"
+                  >+100k</button>
+                  <button
+                    onClick={() => setTargetAlertPrice(prev => Math.max(0, prev - 1000))}
+                    className="bg-black/40 border border-white/5 text-[10px] px-2 py-1 rounded hover:bg-white/10 transition-colors ml-auto"
+                  >-1k</button>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-osrs-border border-t border-osrs-gold/20 flex gap-3">
+              <button
+                onClick={() => setAlertingItem(null)}
+                className="flex-1 py-2 rounded border border-white/10 text-gray-400 font-bold text-sm hover:bg-white/5 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  addAlert({
+                    id: alertingItem.id,
+                    name: alertingItem.name,
+                    targetPrice: targetAlertPrice,
+                    initialPrice: alertPriceType === 'buy' ? alertingItem.buy : alertingItem.sell,
+                    priceType: alertPriceType,
+                    condition: alertCondition,
+                    alertType: alertType,
+                    category: alertCategory,
+                    isTrackingFlip: isLogBuy,
+                    purchasePrice: isLogBuy ? purchasePrice : undefined,
+                    quantity: isLogBuy ? quantity : undefined
+                  });
+                  setAlertingItem(null);
+                }}
+                className="flex-1 py-2 rounded bg-osrs-gold text-black font-bold text-sm hover:brightness-110 shadow-lg transition-all"
+              >
+                Set Alert
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
