@@ -451,7 +451,10 @@ const AlertSidebar: React.FC = () => {
                             <div className="flex justify-between items-end px-1">
                                 <div>
                                     <p className="text-[10px] text-gray-500 uppercase font-bold tracking-widest">Flip Ledger</p>
-                                    <p className="text-xl font-fantasy text-osrs-gold">+{sessionProfit.toLocaleString()}<span className="text-xs ml-1">GP</span></p>
+                                    <p className={`text-xl font-fantasy ${sessionProfit >= 0 ? 'text-osrs-gold' : 'text-red-500'}`}>
+                                        {sessionProfit >= 0 ? '+' : ''}{sessionProfit.toLocaleString()}
+                                        <span className="text-xs ml-1">GP</span>
+                                    </p>
                                 </div>
                                 <button
                                     onClick={clearFlipHistory}

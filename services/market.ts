@@ -184,8 +184,8 @@ export const analyzeMarket = async (settings: FlipSettings): Promise<MarketRespo
     if (!isSpecificItemSearch && settings.strategy === StrategyType.FLIPPING) {
       if (settings.risk === RiskLevel.LOW) {
         // Low Risk: High Liquidity, Stable Margins
-        // 1. Must be liquid: Limit >= 500 OR Volume >= 2000
-        const isLiquid = item.limit >= 500 || volume24h >= 2000;
+        // 1. Must be liquid: Limit >= 500 AND Volume >= 2000
+        const isLiquid = item.limit >= 500 && volume24h >= 2000;
         // 2. Must not be too volatile: ROI <= 5% (Prevent accidentally buying into massive crashes/spikes)
         const isStable = roi <= 5;
 
@@ -193,8 +193,8 @@ export const analyzeMarket = async (settings: FlipSettings): Promise<MarketRespo
       }
       else if (settings.risk === RiskLevel.MEDIUM) {
         // Medium Risk: Moderate Liquidity
-        // Limit >= 50 OR Volume >= 500
-        const isModeratelyLiquid = item.limit >= 50 || volume24h >= 500;
+        // Limit >= 50 AND Volume >= 500
+        const isModeratelyLiquid = item.limit >= 50 && volume24h >= 500;
 
         if (!isModeratelyLiquid) continue;
       }

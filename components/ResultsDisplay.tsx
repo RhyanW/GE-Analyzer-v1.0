@@ -818,7 +818,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                       </button>
                     </div>
 
-                    <span className={`text-[10px] font-mono font-bold px-1.5 py-1 rounded border whitespace-nowrap shadow-sm ${isAlch ? 'text-purple-300 bg-purple-900/30 border-purple-800/50' : 'text-green-500 bg-green-900/30 border-green-900/40'}`}>
+                    <span className={`text-[10px] font-mono font-bold px-1.5 py-1 rounded border whitespace-nowrap shadow-sm ${isAlch ? 'text-purple-300 bg-purple-900/30 border-purple-800/50' : (item.roi < 0 ? 'text-rose-500 bg-rose-950/30 border-rose-900/40' : 'text-emerald-500 bg-emerald-950/30 border-emerald-900/40')}`}>
                       ROI: {item.roi?.toFixed(1) || '0.0'}%
                     </span>
                   </div>
@@ -884,8 +884,10 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                         </div>
                       )}
                       <div className="flex justify-between pt-1 font-bold">
-                        <span className="text-osrs-gold">= Margin</span>
-                        <span className="text-green-400">{item.profit.toLocaleString()}</span>
+                        <span className="text-osrs-gold uppercase text-[10px] tracking-tighter">= Margin</span>
+                        <span className={item.profit < 0 ? 'text-rose-500' : 'text-emerald-400'}>
+                          {item.profit < 0 ? '-' : ''}{Math.abs(item.profit).toLocaleString()}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -952,8 +954,8 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                           )}
                         </div>
                       </div>
-                      <span className="text-lg font-bold text-green-400 font-mono">
-                        {item.profit.toLocaleString()} gp
+                      <span className={`text-lg font-bold font-mono ${item.profit < 0 ? 'text-rose-500' : 'text-emerald-400'}`}>
+                        {item.profit < 0 ? '-' : ''}{Math.abs(item.profit).toLocaleString()} gp
                       </span>
                     </div>
                   </div>
@@ -1084,7 +1086,9 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                 })()}
                 <div className="flex justify-between border-t border-gray-700 pt-2 mt-2 font-bold">
                   <span className="text-osrs-gold">Net Profit</span>
-                  <span className="text-green-400">{selectedItem.profit.toLocaleString()} gp</span>
+                  <span className={selectedItem.profit < 0 ? 'text-rose-500' : 'text-emerald-400'}>
+                    {selectedItem.profit < 0 ? '-' : ''}{Math.abs(selectedItem.profit).toLocaleString()} gp
+                  </span>
                 </div>
               </div>
 
