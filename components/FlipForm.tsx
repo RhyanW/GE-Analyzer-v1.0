@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MembershipStatus, RiskLevel, FlipSettings, StrategyType } from '../types';
 import { Search, Loader2, RefreshCcw, TrendingUp, User, ListOrdered, X } from 'lucide-react';
+import { fetchItemMapping } from '../services/market';
 
 interface FlipFormProps {
   onSearch: (settings: FlipSettings) => void;
@@ -38,8 +39,7 @@ const FlipForm: React.FC<FlipFormProps> = ({
   useEffect(() => {
     const fetchItems = async () => {
       try {
-        const response = await fetch('https://corsproxy.io/?' + encodeURIComponent('https://prices.runescape.wiki/api/v1/osrs/mapping'));
-        const data = await response.json();
+        const data = await fetchItemMapping(); // Use service function
         const names = data.map((item: any) => item.name).sort();
         setAllItems(names);
       } catch (error) {

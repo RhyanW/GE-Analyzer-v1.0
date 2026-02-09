@@ -54,7 +54,7 @@ const fetchWithFallback = async (targetUrl: string): Promise<any> => {
 /**
  * Fetches static item data (IDs, names, limits, alch values)
  */
-const fetchItemMapping = async (): Promise<WikiItemMapping[]> => {
+export const fetchItemMapping = async (): Promise<WikiItemMapping[]> => {
   if (mappingCache) return mappingCache;
   try {
     const data = await fetchWithFallback(MAPPING_URL);
