@@ -94,53 +94,98 @@ export const getPlayerStats = async (username: string): Promise<PlayerStats> => 
   let lastError;
 
   // Attempt 1: corsproxy.io (Usually faster/more reliable for raw text)
+  // try {
+  //   const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+  //   const response = await fetch(proxyUrl);
+
+  //   if (response.ok) {
+  //     const csv = await response.text();
+  //     // Check for 404 text disguised as 200 OK from proxy
+  //     if (csv.includes("404 - Page not found")) {
+  //       throw new Error("User not found");
+  //     }
+  //     return parseStatsCsv(csv);
+  //   }
+  // } catch (err) {
+  //   console.warn("Primary proxy (corsproxy.io) failed, trying backup...", err);
+  //   lastError = err;
+  // }
+
+  // // Attempt 2: allorigins.win (Backup)
+  // try {
+  //   const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+  //   const response = await fetch(proxyUrl);
+
+  //   if (response.ok) {
+  //     const data = await response.json();
+  //     if (data.contents) {
+  //       return parseStatsCsv(data.contents);
+  //     }
+  //   }
+  // } catch (err) {
+  //   console.warn("Backup proxy (allorigins) failed", err);
+  //   lastError = err;
+  // }
+
   try {
-    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
-    const response = await fetch(proxyUrl);
-
-    if (response.ok) {
-      const csv = await response.text();
-      // Check for 404 text disguised as 200 OK from proxy
-      if (csv.includes("404 - Page not found")) {
-        throw new Error("User not found");
-      }
-      return parseStatsCsv(csv);
+    const data = await fetchWithFallback(targetUrl, true); // true for text response (CSV)
+    if (typeof data === 'string' && data.includes("404 - Page not found")) {
+      throw new Error("User not found");
     }
-  } catch (err) {
-    console.warn("Primary proxy (corsproxy.io) failed, trying backup...", err);
-    lastError = err;
-  }
-
-  // Attempt 2: allorigins.win (Backup)
-  try {
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
-    const response = await fetch(proxyUrl);
-
-    if (response.ok) {
-      const data = await response.json();
-      if (data.contents) {
-        return parseStatsCsv(data.contents);
-      }
-    }
-  } catch (err) {
-    console.warn("Backup proxy (allorigins) failed", err);
+    // If data is JSON object from allorigins, it might have been parsed already, but here we expect text.
+    // However, our fetchWithFallback handles allorigins JSON wrapping.
+    // If it came from allorigins, fetchWithFallback parsed the JSON and returned 'contents' which is the CSV string.
+    return parseStatsCsv(data);
+  } catch (err: any) {
+    if (err.message === "User not found") throw err;
     lastError = err;
   }
 
   throw lastError || new Error("Could not fetch OSRS stats. The Highscores API might be down or the username is incorrect.");
 };
 
-const PROXY_URL = 'https://corsproxy.io/?';
+const PROXIES = [
+  'https://api.codetabs.com/v1/proxy?quest=',
+  'https://thingproxy.freeboard.io/fetch/',
+  'https://api.allorigins.win/get?url=',
+  'https://corsproxy.io/?'
+];
+
+const fetchWithFallback = async (targetUrl: string, expectText: boolean = false): Promise<any> => {
+  let lastError;
+
+  for (const proxy of PROXIES) {
+    try {
+      const proxyUrl = `${proxy}${encodeURIComponent(targetUrl)}`;
+      const response = await fetch(proxyUrl);
+
+      if (response.ok) {
+        // allorigins always returns JSON with 'contents'
+        if (proxy.includes('allorigins')) {
+          const data = await response.json();
+          return data.contents; // contents is the raw string (CSV or JSON)
+        }
+
+        if (expectText) {
+          return await response.text();
+        } else {
+          return await response.json();
+        }
+      }
+    } catch (err) {
+      console.warn(`Proxy failed: ${proxy}`, err);
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error(`Failed to fetch data from ${targetUrl} after trying all proxies.`);
+}
 
 export const getItemPriceHistory = async (itemId: number, timestep: '5m' | '1h' | '6h' | '24h' = '6h'): Promise<PriceHistoryPoint[]> => {
   const url = `https://prices.runescape.wiki/api/v1/osrs/timeseries?timestep=${timestep}&id=${itemId}`;
-  const proxyUrl = `${PROXY_URL}${encodeURIComponent(url)}`;
 
   try {
-    const response = await fetch(proxyUrl);
-    if (!response.ok) return [];
-
-    const json = await response.json();
+    const json = await fetchWithFallback(url);
     if (!json.data) return [];
 
     return json.data.map((entry: any) => ({

@@ -1,8 +1,13 @@
 import { FlipSettings, MarketResponseData, ParsedItem, StrategyType, WikiItemMapping, WikiLatestResponse, MembershipStatus, RiskLevel } from "../types";
 
 
-const PROXY_URL = 'https://corsproxy.io/?';
-const BACKUP_PROXY_URL = 'https://api.allorigins.win/get?url=';
+const PROXIES = [
+  'https://api.codetabs.com/v1/proxy?quest=',
+  'https://thingproxy.freeboard.io/fetch/',
+  'https://api.allorigins.win/get?url=',
+  'https://corsproxy.io/?'
+];
+
 const MAPPING_URL = 'https://prices.runescape.wiki/api/v1/osrs/mapping';
 const LATEST_PRICES_URL = 'https://prices.runescape.wiki/api/v1/osrs/latest';
 const VOLUME_24H_URL = 'https://prices.runescape.wiki/api/v1/osrs/24h';
@@ -17,35 +22,33 @@ let mappingCache: WikiItemMapping[] | null = null;
 const fetchWithFallback = async (targetUrl: string): Promise<any> => {
   let lastError;
 
-  // Attempt 1: corsproxy.io (Primary)
-  try {
-    const proxyUrl = PROXY_URL + encodeURIComponent(targetUrl);
-    const response = await fetch(proxyUrl);
-    if (response.ok) {
-      return await response.json();
-    }
-  } catch (err) {
-    console.warn(`Primary proxy failed for ${targetUrl}, trying backup...`, err);
-    lastError = err;
-  }
+  for (const proxy of PROXIES) {
+    try {
+      const proxyUrl = `${proxy}${encodeURIComponent(targetUrl)}`;
+      const response = await fetch(proxyUrl);
 
-  // Attempt 2: allorigins.win (Backup)
-  try {
-    const proxyUrl = `${BACKUP_PROXY_URL}${encodeURIComponent(targetUrl)}`;
-    const response = await fetch(proxyUrl);
-    if (response.ok) {
-      const data = await response.json();
-      // allorigins returns content in a 'contents' field, which might be stringified JSON
-      if (data.contents) {
-        return JSON.parse(data.contents);
+      if (response.ok) {
+        const data = await response.json();
+
+        // Handle allorigins specific response structure
+        if (proxy.includes('allorigins') && data.contents) {
+          // Sometimes contents is stringified JSON, sometimes it's already an object/string depending on content-type
+          try {
+            return JSON.parse(data.contents);
+          } catch (e) {
+            return data.contents;
+          }
+        }
+
+        return data;
       }
+    } catch (err) {
+      console.warn(`Proxy failed: ${proxy}`, err);
+      lastError = err;
     }
-  } catch (err) {
-    console.warn(`Backup proxy failed for ${targetUrl}`, err);
-    lastError = err;
   }
 
-  throw lastError || new Error(`Failed to fetch data from ${targetUrl}`);
+  throw lastError || new Error(`Failed to fetch data from ${targetUrl} after trying all proxies.`);
 };
 
 /**
