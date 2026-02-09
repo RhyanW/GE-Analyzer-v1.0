@@ -19,7 +19,7 @@ let mappingCache: WikiItemMapping[] | null = null;
 /**
  * Helper to fetch data with fallback proxies
  */
-const fetchWithFallback = async (targetUrl: string): Promise<any> => {
+const fetchWithFallback = async (targetUrl: string, expectText: boolean = false): Promise<any> => {
   let lastError;
 
   for (const proxy of PROXIES) {
@@ -32,11 +32,15 @@ const fetchWithFallback = async (targetUrl: string): Promise<any> => {
 
         // Handle allorigins specific response structure
         if (proxy.includes('allorigins') && data.contents) {
-          // Sometimes contents is stringified JSON, sometimes it's already an object/string depending on content-type
+          if (expectText) {
+            return data.contents;
+          }
+          // Try to parse the contents as JSON if we expect an object
           try {
             return JSON.parse(data.contents);
           } catch (e) {
-            return data.contents;
+            console.warn(`Failed to parse allorigins JSON for ${targetUrl}:`, e);
+            throw new Error("Invalid JSON from allorigins"); // Throw to trigger catch block and try next proxy
           }
         }
 
