@@ -2,6 +2,7 @@ import { FlipSettings, MarketResponseData, ParsedItem, StrategyType, WikiItemMap
 
 
 const PROXY_URL = 'https://corsproxy.io/?';
+const BACKUP_PROXY_URL = 'https://api.allorigins.win/get?url=';
 const MAPPING_URL = 'https://prices.runescape.wiki/api/v1/osrs/mapping';
 const LATEST_PRICES_URL = 'https://prices.runescape.wiki/api/v1/osrs/latest';
 const VOLUME_24H_URL = 'https://prices.runescape.wiki/api/v1/osrs/24h';
@@ -11,14 +12,49 @@ const NATURE_RUNE_ID = 561;
 let mappingCache: WikiItemMapping[] | null = null;
 
 /**
+ * Helper to fetch data with fallback proxies
+ */
+const fetchWithFallback = async (targetUrl: string): Promise<any> => {
+  let lastError;
+
+  // Attempt 1: corsproxy.io (Primary)
+  try {
+    const proxyUrl = PROXY_URL + encodeURIComponent(targetUrl);
+    const response = await fetch(proxyUrl);
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (err) {
+    console.warn(`Primary proxy failed for ${targetUrl}, trying backup...`, err);
+    lastError = err;
+  }
+
+  // Attempt 2: allorigins.win (Backup)
+  try {
+    const proxyUrl = `${BACKUP_PROXY_URL}${encodeURIComponent(targetUrl)}`;
+    const response = await fetch(proxyUrl);
+    if (response.ok) {
+      const data = await response.json();
+      // allorigins returns content in a 'contents' field, which might be stringified JSON
+      if (data.contents) {
+        return JSON.parse(data.contents);
+      }
+    }
+  } catch (err) {
+    console.warn(`Backup proxy failed for ${targetUrl}`, err);
+    lastError = err;
+  }
+
+  throw lastError || new Error(`Failed to fetch data from ${targetUrl}`);
+};
+
+/**
  * Fetches static item data (IDs, names, limits, alch values)
  */
 const fetchItemMapping = async (): Promise<WikiItemMapping[]> => {
   if (mappingCache) return mappingCache;
   try {
-    const response = await fetch(PROXY_URL + encodeURIComponent(MAPPING_URL));
-    if (!response.ok) throw new Error("Failed to fetch item mapping");
-    const data = await response.json();
+    const data = await fetchWithFallback(MAPPING_URL);
     mappingCache = data;
     return data;
   } catch (error) {
@@ -32,9 +68,7 @@ const fetchItemMapping = async (): Promise<WikiItemMapping[]> => {
  */
 export const fetchLatestPrices = async (): Promise<WikiLatestResponse> => {
   try {
-    const response = await fetch(PROXY_URL + encodeURIComponent(LATEST_PRICES_URL));
-    if (!response.ok) throw new Error("Failed to fetch latest prices");
-    return await response.json();
+    return await fetchWithFallback(LATEST_PRICES_URL);
   } catch (error) {
     console.error("Price fetch error:", error);
     throw new Error("Could not load real-time prices.");
@@ -46,9 +80,7 @@ export const fetchLatestPrices = async (): Promise<WikiLatestResponse> => {
  */
 const fetch24hVolume = async (): Promise<any> => {
   try {
-    const response = await fetch(PROXY_URL + encodeURIComponent(VOLUME_24H_URL));
-    if (!response.ok) throw new Error("Failed to fetch 24h volume");
-    return await response.json();
+    return await fetchWithFallback(VOLUME_24H_URL);
   } catch (error) {
     console.error("Volume fetch error:", error);
     return { data: {} }; // Return empty data on failure so app doesn't crash
