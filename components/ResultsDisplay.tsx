@@ -233,7 +233,8 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   const displayedItems = useMemo(() => {
     // 1. Filter
     let items = data.parsedItems.filter(item => {
-      const passLimit = (item.limit || 0) >= minLimit;
+      // Limit of -1 means Unlimited, so it always passes minLimit check (unless minLimit is somehow Infinity)
+      const passLimit = (item.limit === -1) || ((item.limit || 0) >= minLimit);
       const passMinProfit = minProfit === '' ? true : item.profit >= minProfit;
       return passLimit && passMinProfit;
     });
@@ -241,12 +242,18 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
     // 2. Sort
     items.sort((a, b) => {
       for (const criterion of sortCriteria) {
-        if (criterion.field === 'recommended') continue; // Skip recommended if it's in the list (it's default order)
+        if (criterion.field === 'recommended') continue;
 
         let valA: number | string = 0;
         let valB: number | string = 0;
 
         switch (criterion.field) {
+          case 'limit':
+            // Treat -1 as Infinity for sorting
+            valA = a.limit === -1 ? Infinity : a.limit;
+            valB = b.limit === -1 ? Infinity : b.limit;
+            break;
+          // ... rest of switch cases are fine ...
           case 'profit':
             valA = a.profit;
             valB = b.profit;
@@ -836,7 +843,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                         <span className="text-xs uppercase">GE Limit</span>
                       </div>
                       <span className="font-mono text-osrs-orange">
-                        {item.limit ? item.limit.toLocaleString() : 'Unknown'} / 4h
+                        {item.limit === -1 ? 'Unlimited' : (item.limit ? item.limit.toLocaleString() : 'Unknown')} / 4h
                       </span>
                     </div>
 
@@ -941,9 +948,9 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                               Est. {formatK(item.hourlyProfit)} / hr
                             </span>
                           )}
-                          {item.limit > 0 && (
+                          {item.limit !== 0 && (
                             <span className="text-[10px] text-gray-500">
-                              Max: {formatK(item.profit * item.limit)} / 4h
+                              Max: {item.limit === -1 ? 'Unlimited' : formatK(item.profit * item.limit)} / 4h
                             </span>
                           )}
                           {isAlch && item.limit > 0 && (
@@ -1027,7 +1034,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
                 <div className="bg-black/30 p-3 rounded border border-osrs-border/30 text-center">
                   <span className="text-xs text-gray-400 block mb-1">Limit (4h)</span>
                   <span className="text-lg font-mono text-osrs-orange">
-                    {selectedItem.limit > 0 ? selectedItem.limit.toLocaleString() : '?'}
+                    {selectedItem.limit === -1 ? 'Unlimited' : (selectedItem.limit > 0 ? selectedItem.limit.toLocaleString() : '?')}
                   </span>
                 </div>
                 <div className="bg-black/30 p-3 rounded border border-osrs-border/30 text-center col-span-2 sm:col-span-4">

@@ -265,8 +265,9 @@ export const analyzeMarket = async (settings: FlipSettings): Promise<MarketRespo
     const hourlyProfit = profit * actualHourlyRate;
 
     // Potential Profit per 4h window (capped by budget)
-    // Use 0 if limit is undefined to avoid NaN
-    const potentialProfit = profit * Math.min(item.limit || 0, maxBuyableTotal);
+    // Use Infinity (maxBuyableTotal) if limit is undefined (-1)
+    const effectiveLimit = (!item.limit) ? Infinity : item.limit;
+    const potentialProfit = profit * Math.min(effectiveLimit, maxBuyableTotal);
 
     // Add to candidates
     candidates.push({
@@ -275,7 +276,7 @@ export const analyzeMarket = async (settings: FlipSettings): Promise<MarketRespo
       buy: buyPrice,
       sell: sellPrice,
       profit: Math.floor(profit),
-      limit: item.limit || 0,
+      limit: item.limit ?? -1, // -1 indicates Unlimited/Unknown
       roi: roi,
       potentialProfit: potentialProfit,
       volume: volume24h,
