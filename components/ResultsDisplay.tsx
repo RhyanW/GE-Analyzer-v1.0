@@ -233,7 +233,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
   const displayedItems = useMemo(() => {
     // 1. Filter
     let items = data.parsedItems.filter(item => {
-      const passLimit = item.limit >= minLimit;
+      const passLimit = (item.limit || 0) >= minLimit;
       const passMinProfit = minProfit === '' ? true : item.profit >= minProfit;
       return passLimit && passMinProfit;
     });
