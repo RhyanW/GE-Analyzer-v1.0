@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
 import GEFlipperPage from './pages/GEFlipperPage';
 import SkillAnalyzerPage from './pages/SkillAnalyzerPage';
+import BestInSlotPage from './pages/BestInSlotPage';
 
 import HighAlchemyPage from './pages/HighAlchemyPage';
 
@@ -17,6 +18,7 @@ const App: React.FC = () => {
           <Route path="/flipper" element={<GEFlipperPage />} />
           <Route path="/alchemy" element={<HighAlchemyPage />} />
           <Route path="/skills" element={<SkillAnalyzerPage />} />
+          <Route path="/bis" element={<BestInSlotPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>

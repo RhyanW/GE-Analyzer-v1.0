@@ -266,10 +266,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
             valA = a.roi || 0;
             valB = b.roi || 0;
             break;
-          case 'limit':
-            valA = a.limit;
-            valB = b.limit;
-            break;
+
           case 'volume':
             valA = a.volume || 0;
             valB = b.volume || 0;

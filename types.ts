@@ -172,3 +172,87 @@ export interface CompletedFlip {
   roi: number;
   timestamp: number;
 }
+
+// Best in Slot Types
+
+export enum CombatStyle {
+  MELEE = 'Melee',
+  RANGED = 'Ranged',
+  MAGIC = 'Magic'
+}
+
+export enum AttackType {
+  STAB = 'Stab',
+  SLASH = 'Slash',
+  CRUSH = 'Crush',
+  MAGIC = 'Magic',
+  RANGED = 'Ranged'
+}
+
+export enum CombatFocus {
+  OFFENSE = 'Offense',
+  DEFENCE = 'Defence'
+}
+
+export enum SlotType {
+  HEAD = 'head',
+  CAPE = 'cape',
+  NECK = 'neck',
+  AMMO = 'ammo',
+  WEAPON = 'weapon',
+  BODY = 'body',
+  SHIELD = 'shield',
+  LEGS = 'legs',
+  HANDS = 'hands',
+  FEET = 'feet',
+  RING = 'ring',
+  TWO_HANDED = '2h'
+}
+
+export interface EquipmentStats {
+  attack_stab: number;
+  attack_slash: number;
+  attack_crush: number;
+  attack_magic: number;
+  attack_ranged: number;
+  defence_stab: number;
+  defence_slash: number;
+  defence_crush: number;
+  defence_magic: number;
+  defence_ranged: number;
+  melee_strength: number;
+  ranged_strength: number;
+  magic_damage: number;
+  prayer: number;
+}
+
+export interface EquipableItem {
+  id: number;
+  name: string;
+  slot: string;
+  is2h?: boolean;
+  stats: EquipmentStats;
+  wiki_price?: number;
+  wiki_url?: string;
+  release_date?: string;
+  requirements?: Record<string, number>;
+  members: boolean;
+  tradeable: boolean;
+  equipable_by_player: boolean;
+  icon?: string;
+  attack_speed?: number; // Ticks (0.6s)
+}
+
+export interface BisSettings {
+  combatStyle: CombatStyle;
+  budget: number;
+  statsFilter: Partial<EquipmentStats>;
+}
+
+export interface BisResult {
+  items: Record<string, EquipableItem | null>;
+  totalStats: EquipmentStats;
+  totalCost: number;
+  remainingBudget: number;
+  maxHit: number;
+}

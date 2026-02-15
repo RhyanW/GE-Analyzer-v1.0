@@ -81,6 +81,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               >
                 <span className="text-lg leading-none">📊</span> <span className="hidden sm:inline">Skills</span>
               </NavLink>
+
+              <NavLink
+                to="/bis"
+                className={({ isActive }) =>
+                  `flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all ${isActive
+                    ? 'bg-osrs-gold text-black shadow-lg'
+                    : 'text-gray-400 hover:text-white hover:bg-white/10'}`
+                }
+              >
+                <span className="text-lg leading-none">⚔️</span> <span className="hidden sm:inline">Best in Slot</span>
+              </NavLink>
             </nav>
           </div>
         </div>
