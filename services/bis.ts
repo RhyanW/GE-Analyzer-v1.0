@@ -350,7 +350,13 @@ export const calculateSetStats = (
 /**
  * Searches the loaded item cache for items matching the slot and query.
  */
-export const searchItems = async (slot: string, query: string): Promise<EquipableItem[]> => {
+export const searchItems = async (
+    slot: string,
+    query: string,
+    playerStats?: any,
+    isMembers: boolean = true,
+    unlockedItems: number[] = []
+): Promise<EquipableItem[]> => {
     // Ensure items are loaded
     const [allItems, pricesData] = await Promise.all([
         fetchEquipableItems(),
@@ -359,21 +365,36 @@ export const searchItems = async (slot: string, query: string): Promise<Equipabl
 
     const prices = pricesData.data;
     const lowerQuery = query.toLowerCase();
+    const unlockedSet = new Set(unlockedItems);
 
     return allItems.filter(item => {
         // Name match first for speed
         if (!item.name.toLowerCase().includes(lowerQuery)) return false;
 
         // Slot match
-        if (slot === 'all') return true;
+        let slotMatch = false;
+        if (slot === 'all') {
+            slotMatch = true;
+        } else if (item.slot === slot) {
+            slotMatch = true;
+        } else if (slot === SlotType.WEAPON && (item.slot === '2h' || item.is2h)) {
+            slotMatch = true;
+        }
 
-        if (item.slot === slot) return true;
+        if (!slotMatch) return false;
 
-        // Weapon/2h handling
-        if (slot === SlotType.WEAPON && (item.slot === '2h' || item.is2h)) return true;
-        if (slot === '2h' && item.slot === SlotType.WEAPON) return false;
+        // Apply filters
+        if (!isMembers && item.members) return false;
+        if (!item.tradeable && !unlockedSet.has(item.id)) return false;
+        if (!item.equipable_by_player) return false;
 
-        return false;
+        if (playerStats && item.requirements) {
+            for (const [skill, level] of Object.entries(item.requirements)) {
+                if (playerStats[skill] && playerStats[skill].level < level) return false;
+            }
+        }
+
+        return true;
     }).map(item => {
         const itemWithPrice = { ...item };
         if (prices[item.id]) {

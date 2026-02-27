@@ -2,15 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { Search, X } from 'lucide-react';
 import { EquipableItem } from '../types';
 import { searchItems } from '../services/bis';
+import { PlayerStats } from '../services/osrs';
 
 interface ItemSelectorModalProps {
     isOpen: boolean;
     onClose: () => void;
     slot: string;
     onSelect: (item: EquipableItem) => void;
+    playerStats: PlayerStats | null;
+    isMembers: boolean;
+    unlockedItems: number[];
 }
 
-const ItemSelectorModal: React.FC<ItemSelectorModalProps> = ({ isOpen, onClose, slot, onSelect }) => {
+const ItemSelectorModal: React.FC<ItemSelectorModalProps> = ({ isOpen, onClose, slot, onSelect, playerStats, isMembers, unlockedItems }) => {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<EquipableItem[]>([]);
 
@@ -18,14 +22,14 @@ const ItemSelectorModal: React.FC<ItemSelectorModalProps> = ({ isOpen, onClose, 
         if (isOpen) {
             setQuery('');
             // Load initial suggestions (e.g. top items for slot) or just empty
-            searchItems(slot, '').then(items => setResults(items.slice(0, 20)));
+            searchItems(slot, '', playerStats, isMembers, unlockedItems).then(items => setResults(items.slice(0, 20)));
         }
     }, [isOpen, slot]);
 
     useEffect(() => {
         const timeoutId = setTimeout(() => {
             if (isOpen) {
-                searchItems(slot, query).then(items => setResults(items));
+                searchItems(slot, query, playerStats, isMembers, unlockedItems).then(items => setResults(items));
             }
         }, 300); // Debounce
         return () => clearTimeout(timeoutId);

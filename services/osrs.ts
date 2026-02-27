@@ -51,6 +51,24 @@ export const getNextLevelXp = (currentLevel: number): number => {
   return XP_TABLE[currentLevel + 1];
 };
 
+export const calculateCombatLevel = (stats: any): number => {
+  const defence = stats.defence?.level || 1;
+  const hitpoints = stats.hitpoints?.level || 10;
+  const prayer = stats.prayer?.level || 1;
+  const attack = stats.attack?.level || 1;
+  const strength = stats.strength?.level || 1;
+  const magic = stats.magic?.level || 1;
+  const ranged = stats.ranged?.level || 1;
+
+  const baseLevel = 0.25 * (defence + hitpoints + Math.floor(prayer / 2));
+  const meleeLevel = 0.325 * (attack + strength);
+  const rangeLevel = 0.325 * (Math.floor(1.5 * ranged));
+  const magicLevel = 0.325 * (Math.floor(1.5 * magic));
+
+  const finalCombat = Math.floor(baseLevel + Math.max(meleeLevel, rangeLevel, magicLevel));
+  return finalCombat;
+};
+
 /**
  * Parses the CSV response from OSRS API
  */
@@ -84,6 +102,14 @@ const parseStatsCsv = (csv: string): PlayerStats => {
       };
     }
   });
+
+  if (stats.hitpoints) {
+    stats.combat = {
+      rank: -1,
+      level: calculateCombatLevel(stats),
+      xp: 0
+    };
+  }
 
   return stats as PlayerStats;
 };

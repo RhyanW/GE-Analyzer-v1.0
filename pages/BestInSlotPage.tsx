@@ -661,6 +661,9 @@ const BestInSlotPage: React.FC = () => {
                 onClose={() => setIsSwapModalOpen(false)}
                 slot={swapSlot}
                 onSelect={handleItemSelect}
+                playerStats={stats}
+                isMembers={isMembers}
+                unlockedItems={unlockedItems}
             />
         </div >
     );

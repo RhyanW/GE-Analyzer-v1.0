@@ -96,6 +96,7 @@ export interface PlayerStats {
   hunter: SkillData;
   construction: SkillData;
   sailing?: SkillData;
+  combat?: SkillData;
 }
 
 export interface PriceHistoryPoint {
