@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Coins, BookOpen, Activity } from 'lucide-react';
+import { Coins, BookOpen, Activity, Trophy, Swords } from 'lucide-react';
 
 const HomePage: React.FC = () => {
     const navigate = useNavigate();
@@ -59,6 +59,33 @@ const HomePage: React.FC = () => {
                     </p>
                 </div>
 
+                {/* Achievement Diaries Card */}
+                <div
+                    onClick={() => navigate('/diaries')}
+                    className="bg-osrs-panel border-2 border-osrs-border p-6 rounded-lg cursor-pointer hover:border-green-500 hover:shadow-[0_0_20px_rgba(34,197,94,0.15)] transition-all group flex flex-col items-center text-center"
+                >
+                    <div className="p-4 bg-osrs-bg border border-osrs-border rounded-full mb-4 group-hover:scale-110 transition-transform">
+                        <Trophy className="w-12 h-12 text-green-500" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-white mb-2">Achievement Diaries</h3>
+                    <p className="text-gray-400 text-sm">
+                        Check your skill levels against all OSRS region diary requirements.
+                    </p>
+                </div>
+
+                {/* Best in Slot Card */}
+                <div
+                    onClick={() => navigate('/bis')}
+                    className="bg-osrs-panel border-2 border-osrs-border p-6 rounded-lg cursor-pointer hover:border-red-500 hover:shadow-[0_0_20px_rgba(239,68,68,0.15)] transition-all group flex flex-col items-center text-center"
+                >
+                    <div className="p-4 bg-osrs-bg border border-osrs-border rounded-full mb-4 group-hover:scale-110 transition-transform">
+                        <Swords className="w-12 h-12 text-red-500" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-white mb-2">Best in Slot</h3>
+                    <p className="text-gray-400 text-sm">
+                        Find the ultimate gear loadouts for your specific combat level and budget.
+                    </p>
+                </div>
 
             </div>
 

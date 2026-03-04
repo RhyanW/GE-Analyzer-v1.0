@@ -7,7 +7,7 @@ import SkillAnalyzerPage from './pages/SkillAnalyzerPage';
 import BestInSlotPage from './pages/BestInSlotPage';
 
 import HighAlchemyPage from './pages/HighAlchemyPage';
-
+import AchievementDiariesPage from './pages/AchievementDiariesPage';
 
 const App: React.FC = () => {
   return (
@@ -19,6 +19,7 @@ const App: React.FC = () => {
           <Route path="/alchemy" element={<HighAlchemyPage />} />
           <Route path="/skills" element={<SkillAnalyzerPage />} />
           <Route path="/bis" element={<BestInSlotPage />} />
+          <Route path="/diaries" element={<AchievementDiariesPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
