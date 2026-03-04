@@ -56,8 +56,8 @@ const DiaryTierCard: React.FC<{ tierReq: any, stats: any }> = ({ tierReq, stats 
                             const skillMet = playerLvl >= reqLevelNum;
 
                             return (
-                                <div key={skill} className={`text-xs bg-black/40 px-2 py-1.5 rounded flex justify-between items-center border ${skillMet ? 'text-green-300 border-green-900/50' : 'text-red-300 border-red-900/50'}`}>
-                                    <span className="capitalize font-semibold">{skill}</span>
+                                <div key={skill} className={`text-xs bg-black/40 px-2 py-1.5 rounded flex justify-between items-center gap-2 border ${skillMet ? 'text-green-300 border-green-900/50' : 'text-red-300 border-red-900/50'}`}>
+                                    <span className="capitalize font-semibold truncate">{skill}</span>
                                     <div className="flex items-center gap-1">
                                         <span className={skillMet ? 'text-green-400 font-mono' : 'text-red-400 font-mono'}>{playerLvl}</span>
                                         <span className="text-gray-500 text-[10px]">/</span>
@@ -174,7 +174,7 @@ const AchievementDiariesPage: React.FC = () => {
                         <p className="text-gray-400 text-sm mt-1">Based on highest skill requirements per tier.</p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
                         {achievementDiaries.map((diary: RegionDiary) => (
                             <div key={diary.region} className="bg-osrs-panel border border-osrs-border rounded-lg overflow-hidden flex flex-col shadow-lg shadow-black/50">
                                 <div className="bg-black/60 px-4 py-3 border-b border-osrs-border flex items-center justify-between">
